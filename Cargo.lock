@@ -1449,6 +1449,7 @@ dependencies = [
  "frost-core 2.2.0",
  "frost-rerandomized 2.2.0",
  "orchard",
+ "rand",
  "rand_core",
  "reddsa 0.5.1",
  "sapphire-chain",
