@@ -26,9 +26,13 @@
 //! party wants the signed tx (typically the caller).
 
 pub mod abci;
+pub mod dkg_envelope;
 pub mod sim;
 pub mod state;
 pub mod tx;
 
-pub use state::{apply_tx, ApplyError, RequestEntry, RequestStatus, State};
+pub use dkg_envelope::{open as open_envelope, seal as seal_envelope, EncPublicKey, Sealed};
+pub use state::{
+    apply_tx, ApplyError, DkgCeremony, RequestEntry, RequestStatus, State,
+};
 pub use tx::Tx;

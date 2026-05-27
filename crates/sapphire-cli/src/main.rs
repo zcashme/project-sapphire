@@ -16,7 +16,7 @@ use rand::rngs::OsRng;
 use sapphire_chain::{sim::ChainSim, state::RequestStatus, tx::Tx as ChainTx};
 use sapphire_core::{protocol::uuid_lite::Uuid, protocol::KeyShareBundle, MpcParams};
 use sapphire_keygen::{generate_with_dkg, generate_with_trusted_dealer};
-use sapphire_validator::Validator;
+use sapphire_validator::{DkgParticipant, Validator};
 
 type Cs = Ed25519Sha512;
 
@@ -87,33 +87,66 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
     use frost_core::{Field, Group};
     use frost_rerandomized::{RandomizedParams, Randomizer};
     use reddsa::frost::redpallas::PallasBlake2b512 as V1Cs;
+    use std::collections::BTreeMap;
 
     let mut rng = OsRng;
     let params = MpcParams::new(threshold, total)?;
     println!("== V1: BFT coordination chain (in-process simulator) ==");
     println!("    ciphersuite: RedPallas (Zcash Orchard spend-auth), rerandomized\n");
-    println!("[setup] running DKG ({}-of-{})...", threshold, total);
-    let (key_packages, pkp) = generate_with_dkg::<V1Cs, _>(params, &mut rng)?;
-    let mut validators: Vec<Validator<V1Cs>> = key_packages
-        .into_iter()
-        .map(|(_, kp)| {
-            Validator::new(KeyShareBundle {
-                key_package: kp,
-                public_key_package: pkp.clone(),
-            })
+
+    // ---- DKG over the chain ----
+    println!("[setup] chain-driven DKG ({}-of-{}): each validator publishes",
+        threshold, total);
+    println!("        its X25519 enc pubkey, runs FROST DKG rounds 1→2→3 as");
+    println!("        chain txs, then the chain promotes the agreed PKP into");
+    println!("        a GroupConfig.\n");
+
+    let mut participants: Vec<DkgParticipant<V1Cs>> = (1..=total)
+        .map(|i| {
+            let id: frost_core::Identifier<V1Cs> =
+                i.try_into().expect("identifier in range");
+            DkgParticipant::<V1Cs>::new(id, &mut rng)
         })
         .collect();
-    let validator_ids: Vec<_> = validators.iter().map(|v| v.identifier).collect();
-    let mut chain: ChainSim<V1Cs> = ChainSim::new();
 
-    // Block 1: InitGroup
-    chain.submit(ChainTx::InitGroup {
+    let mut chain: ChainSim<V1Cs> = ChainSim::new();
+    let dkg_validators: BTreeMap<_, _> = participants
+        .iter()
+        .map(|p| (p.identifier, p.enc_public))
+        .collect();
+    chain.submit(ChainTx::DkgBegin {
         params,
-        pkp: pkp.clone(),
-        validators: validator_ids,
+        validators: dkg_validators,
     });
     let results = chain.commit_block();
-    print_block(&chain, &results, "InitGroup");
+    print_block(&chain, &results, "DkgBegin");
+
+    let mut step = 0;
+    while chain.state.group.is_none() {
+        step += 1;
+        if step > 20 {
+            return Err(anyhow!("DKG failed to converge in 20 blocks"));
+        }
+        for p in participants.iter_mut() {
+            for tx in p.react(&chain.state, &mut rng)
+                .map_err(|e| anyhow!("dkg react: {e}"))?
+            {
+                chain.submit(tx);
+            }
+        }
+        let results = chain.commit_block();
+        let label = if chain.state.group.is_some() {
+            "DkgRound* → promoted to GroupConfig"
+        } else {
+            "DkgRound*"
+        };
+        print_block(&chain, &results, label);
+    }
+    let pkp = chain.state.group.as_ref().unwrap().pkp.clone();
+    let mut validators: Vec<Validator<V1Cs>> = participants
+        .into_iter()
+        .map(|p| p.into_validator().expect("DKG complete"))
+        .collect();
 
     // Block 2: client picks a randomizer (stand-in for the Orchard `α`)
     // and submits the signing request.

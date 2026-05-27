@@ -17,6 +17,10 @@
 //! coordinator. That's the V1 architectural shift away from the centralized
 //! HTTP coordinator in V0.
 
+pub mod dkg;
+
+pub use dkg::{DkgError, DkgParticipant};
+
 use std::collections::HashSet;
 
 use frost_core::{Ciphersuite, Identifier};

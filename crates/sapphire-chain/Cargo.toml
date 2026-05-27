@@ -16,6 +16,7 @@ thiserror.workspace = true
 tracing.workspace = true
 rand.workspace = true
 rand_core.workspace = true
+crypto_box.workspace = true
 
 [dev-dependencies]
 sapphire-keygen.workspace = true

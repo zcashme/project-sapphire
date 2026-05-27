@@ -62,4 +62,4 @@ zeroize = "1.8"
 once_cell = "1.20"
 
 # Sealed envelopes for DKG round-2 (X25519 + XChaCha20-Poly1305)
-crypto_box = { version = "0.9", features = ["seal"] }
+crypto_box = { version = "0.9", features = ["chacha20"] }

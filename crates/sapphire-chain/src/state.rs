@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use frost_core::{
-    keys::PublicKeyPackage,
+    keys::{dkg::round1 as dkg_r1, PublicKeyPackage},
     round1::SigningCommitments,
     round2::SignatureShare,
     Ciphersuite, Identifier, Signature, SigningPackage,
@@ -21,6 +21,7 @@ use thiserror::Error;
 
 use sapphire_core::{protocol::uuid_lite::Uuid, MpcParams};
 
+use crate::dkg_envelope::{EncPublicKey, Sealed};
 use crate::tx::Tx;
 
 /// Per-request entry on the chain.
@@ -60,10 +61,57 @@ pub enum RequestStatus<C: Ciphersuite> {
     Failed { reason: String },
 }
 
+/// Distributed key generation ceremony, as a chain-resident state machine.
+///
+/// Mirrors the three rounds of FROST DKG:
+///  * `round1` — public polynomial-commitment packages, broadcast from each
+///    participant to the rest.
+///  * `round2` — per-(sender, recipient) secret-share contributions, sealed
+///    to the recipient's X25519 key. The chain stores the ciphertexts.
+///  * `finalize` — each participant's locally-derived [`PublicKeyPackage`].
+///    When all `total` participants submit matching PKPs, the ceremony
+///    "promotes" into a [`GroupConfig`] and is cleared from `state.ceremony`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(bound = "C: Ciphersuite")]
+pub struct DkgCeremony<C: Ciphersuite> {
+    pub params: MpcParams,
+    /// Identifier → X25519 public key used to seal round-2 packages.
+    pub validators: BTreeMap<Identifier<C>, EncPublicKey>,
+    /// Round-1 packages submitted by each participant. Public.
+    pub round1: BTreeMap<Identifier<C>, dkg_r1::Package<C>>,
+    /// Round-2 sealed envelopes, keyed by `(from, to)`. The chain never
+    /// decrypts these.
+    pub round2: BTreeMap<(Identifier<C>, Identifier<C>), Sealed>,
+    /// Locally-derived [`PublicKeyPackage`]s submitted by each participant.
+    /// The state machine confirms all agree before promoting to GroupConfig.
+    pub finalize: BTreeMap<Identifier<C>, PublicKeyPackage<C>>,
+}
+
+impl<C: Ciphersuite> DkgCeremony<C> {
+    fn total(&self) -> usize {
+        self.params.total as usize
+    }
+
+    pub fn r1_complete(&self) -> bool {
+        self.round1.len() == self.total()
+    }
+
+    pub fn r2_complete(&self) -> bool {
+        // Every ordered pair (from, to) with from != to must have an envelope.
+        let total = self.total();
+        self.round2.len() == total * (total - 1)
+    }
+
+    pub fn finalize_complete(&self) -> bool {
+        self.finalize.len() == self.total()
+    }
+}
+
 /// The chain's full state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C: Ciphersuite")]
 pub struct State<C: Ciphersuite> {
+    pub ceremony: Option<DkgCeremony<C>>,
     pub group: Option<GroupConfig<C>>,
     pub requests: BTreeMap<Uuid, RequestEntry<C>>,
 }
@@ -71,6 +119,7 @@ pub struct State<C: Ciphersuite> {
 impl<C: Ciphersuite> Default for State<C> {
     fn default() -> Self {
         Self {
+            ceremony: None,
             group: None,
             requests: BTreeMap::new(),
         }
@@ -95,6 +144,39 @@ pub enum ApplyError {
 
     #[error("validator set in InitGroup does not match the public key package")]
     ValidatorSetMismatch,
+
+    #[error("DKG ceremony already in progress")]
+    CeremonyAlreadyInProgress,
+
+    #[error("DKG ceremony not in progress")]
+    NoCeremony,
+
+    #[error("DKG validator set must have exactly `total` participants")]
+    BadDkgValidatorCount,
+
+    #[error("DKG: round 1 not complete yet")]
+    Round1NotComplete,
+
+    #[error("DKG: round 2 not complete yet")]
+    Round2NotComplete,
+
+    #[error("DKG: participant {0:?} already submitted round-1 package")]
+    DuplicateRound1(String),
+
+    #[error("DKG: participant {0:?} already submitted round-2 envelope to {1:?}")]
+    DuplicateRound2(String, String),
+
+    #[error("DKG: participant {0:?} already submitted finalize")]
+    DuplicateFinalize(String),
+
+    #[error("DKG: participant {0:?} cannot self-address a round-2 envelope")]
+    SelfAddressedRound2(String),
+
+    #[error("DKG: validator {0:?} not in the ceremony validator set")]
+    UnknownDkgValidator(String),
+
+    #[error("DKG: participant {0:?} submitted a PKP that disagrees with the rest")]
+    PkpMismatch(String),
 
     #[error("request {0} already exists")]
     DuplicateRequest(Uuid),
@@ -140,7 +222,9 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
             if next.group.is_some() {
                 return Err(ApplyError::AlreadyInitialized);
             }
-            // Validators must exactly match the verifying shares in the PKP.
+            if next.ceremony.is_some() {
+                return Err(ApplyError::CeremonyAlreadyInProgress);
+            }
             let pkp_ids: BTreeSet<Identifier<C>> =
                 pkp.verifying_shares().keys().copied().collect();
             let vs: BTreeSet<Identifier<C>> = validators.iter().copied().collect();
@@ -152,6 +236,100 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
                 pkp: pkp.clone(),
                 validators: vs,
             });
+        }
+
+        Tx::DkgBegin { params, validators } => {
+            if next.group.is_some() {
+                return Err(ApplyError::AlreadyInitialized);
+            }
+            if next.ceremony.is_some() {
+                return Err(ApplyError::CeremonyAlreadyInProgress);
+            }
+            if validators.len() != params.total as usize {
+                return Err(ApplyError::BadDkgValidatorCount);
+            }
+            next.ceremony = Some(DkgCeremony {
+                params: *params,
+                validators: validators.clone(),
+                round1: BTreeMap::new(),
+                round2: BTreeMap::new(),
+                finalize: BTreeMap::new(),
+            });
+        }
+
+        Tx::DkgRound1 { from, package } => {
+            let ceremony = next.ceremony.as_mut().ok_or(ApplyError::NoCeremony)?;
+            if !ceremony.validators.contains_key(from) {
+                return Err(ApplyError::UnknownDkgValidator(format!("{:?}", from)));
+            }
+            if ceremony.round1.contains_key(from) {
+                return Err(ApplyError::DuplicateRound1(format!("{:?}", from)));
+            }
+            ceremony.round1.insert(*from, package.clone());
+        }
+
+        Tx::DkgRound2 { from, to, sealed } => {
+            let ceremony = next.ceremony.as_mut().ok_or(ApplyError::NoCeremony)?;
+            if !ceremony.r1_complete() {
+                return Err(ApplyError::Round1NotComplete);
+            }
+            if from == to {
+                return Err(ApplyError::SelfAddressedRound2(format!("{:?}", from)));
+            }
+            if !ceremony.validators.contains_key(from) {
+                return Err(ApplyError::UnknownDkgValidator(format!("{:?}", from)));
+            }
+            if !ceremony.validators.contains_key(to) {
+                return Err(ApplyError::UnknownDkgValidator(format!("{:?}", to)));
+            }
+            let key = (*from, *to);
+            if ceremony.round2.contains_key(&key) {
+                return Err(ApplyError::DuplicateRound2(
+                    format!("{:?}", from),
+                    format!("{:?}", to),
+                ));
+            }
+            ceremony.round2.insert(key, sealed.clone());
+        }
+
+        Tx::DkgFinalize { from, pkp } => {
+            let ceremony = next.ceremony.as_mut().ok_or(ApplyError::NoCeremony)?;
+            if !ceremony.r2_complete() {
+                return Err(ApplyError::Round2NotComplete);
+            }
+            if !ceremony.validators.contains_key(from) {
+                return Err(ApplyError::UnknownDkgValidator(format!("{:?}", from)));
+            }
+            if ceremony.finalize.contains_key(from) {
+                return Err(ApplyError::DuplicateFinalize(format!("{:?}", from)));
+            }
+            // All participants must derive the same PKP. Check against the
+            // first submitted one if any exists.
+            if let Some((_, first)) = ceremony.finalize.iter().next() {
+                if first.verifying_key() != pkp.verifying_key()
+                    || first.verifying_shares() != pkp.verifying_shares()
+                {
+                    return Err(ApplyError::PkpMismatch(format!("{:?}", from)));
+                }
+            }
+            ceremony.finalize.insert(*from, pkp.clone());
+
+            // Promote: if every participant has finalized (and they all
+            // agreed by construction above), commit the GroupConfig.
+            if ceremony.finalize_complete() {
+                let ceremony = next.ceremony.take().expect("just confirmed present");
+                let validators: BTreeSet<_> = ceremony.validators.keys().copied().collect();
+                let agreed_pkp = ceremony
+                    .finalize
+                    .into_values()
+                    .next()
+                    .expect("finalize_complete implies non-empty");
+                next.group = Some(GroupConfig {
+                    params: ceremony.params,
+                    pkp: agreed_pkp,
+                    validators,
+                });
+            }
         }
 
         Tx::SubmitRequest {
