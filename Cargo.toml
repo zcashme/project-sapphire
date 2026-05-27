@@ -7,6 +7,7 @@ members = [
     "crates/sapphire-chain",
     "crates/sapphire-validator",
     "crates/sapphire-zcash",
+    "crates/sapphire-net",
     "crates/sapphire-cli",
     "crates/sapphire-tests",
 ]
@@ -27,6 +28,7 @@ sapphire-signer = { path = "crates/sapphire-signer" }
 sapphire-chain = { path = "crates/sapphire-chain" }
 sapphire-validator = { path = "crates/sapphire-validator" }
 sapphire-zcash = { path = "crates/sapphire-zcash" }
+sapphire-net = { path = "crates/sapphire-net" }
 
 # FROST stack
 frost-core = { version = "2.2", features = ["serde"] }

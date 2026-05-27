@@ -4,10 +4,10 @@
 //! between blocks, then commits a block by applying them in order. Validators
 //! observe each new state and can react by submitting further transactions.
 //!
-//! No CometBFT dependency; same semantics as the real chain, just without
-//! cryptographic block production / network gossip. Drop-in replacement for
-//! tests and demos; the production runtime swaps in a `tower-abci` adapter
-//! that calls [`apply_tx`] from `DeliverTx`.
+//! Test/demo equivalent of the production mesh runtime: same `apply_tx`
+//! semantics, no network. Production uses `sapphire-net`'s gossip mesh
+//! between the validators; `ChainSim` substitutes a single in-memory
+//! mempool so tests can drive the state machine deterministically.
 
 use std::collections::VecDeque;
 

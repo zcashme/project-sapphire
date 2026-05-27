@@ -208,9 +208,9 @@ pub enum ApplyError {
 
 /// Apply a single transaction to the state. Returns a new state on success.
 ///
-/// This is the pure deterministic core of the chain. A real BFT runtime
-/// (CometBFT via tower-abci, etc.) drives this from `DeliverTx` / equivalent
-/// in block order.
+/// Pure deterministic core. The driving runtime — mesh gossip in production,
+/// `sim::ChainSim` in tests — feeds txs in some order; this function only
+/// requires that *all* honest validators see *all* txs eventually.
 pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>, ApplyError> {
     let mut next = state.clone();
     match tx {

@@ -15,6 +15,7 @@ sapphire-signer.workspace = true
 sapphire-chain.workspace = true
 sapphire-validator.workspace = true
 sapphire-zcash.workspace = true
+sapphire-net.workspace = true
 frost-core.workspace = true
 frost-ed25519.workspace = true
 frost-rerandomized.workspace = true
@@ -23,3 +24,6 @@ pasta_curves = "0.5"
 ff = "0.13"
 rand.workspace = true
 hex.workspace = true
+tokio = { workspace = true, features = ["full", "test-util", "macros", "rt-multi-thread"] }
+serde_json.workspace = true
+tracing-subscriber.workspace = true

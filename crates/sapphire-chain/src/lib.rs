@@ -1,31 +1,33 @@
-//! Sapphire coordination chain.
+//! Sapphire coordination state machine.
 //!
-//! The V1 design replaces the centralized HTTP coordinator with a BFT
-//! coordination chain whose validators are also the MPC signers. Every step
-//! of a signing session — the request itself, each participant's round-1
-//! commitment, each participant's round-2 share — flows as a transaction
-//! on the chain. The chain's state machine deterministically aggregates the
-//! final FROST signature once enough shares are committed.
+//! Validators are also the MPC signers. Every step of a signing session — the
+//! request itself, each participant's round-1 commitment, each participant's
+//! round-2 share — flows as a [`Tx`] applied to the deterministic [`State`].
+//! DKG runs the same way: each round is a tx, the state machine cross-checks,
+//! and the ceremony promotes itself into a `GroupConfig` when complete.
+//!
+//! Consensus is *not* this crate's problem. `apply_tx` is monotonic and
+//! commutative across non-conflicting inputs, so eventual delivery of all
+//! txs to every validator suffices. The mesh layer (`sapphire-net`) provides
+//! that delivery; the in-memory simulator [`sim::ChainSim`] is the test
+//! equivalent.
 //!
 //! ## What lives here
 //!
-//! * [`Tx`] — the chain's transaction types.
-//! * [`State`] — the deterministic state machine.
+//! * [`Tx`] — the transaction types.
+//! * [`State`] — the deterministic state.
 //! * [`apply_tx`] — the pure state-transition function.
-//! * `mod sim` — an in-process simulator (no CometBFT dependency) used by
-//!   `sapphire-tests` and by demos. The same [`State`] / [`apply_tx`] pair
-//!   plugs straight into a `tower-abci` adapter for real CometBFT
-//!   deployment — that's the next engineering step, not a redesign.
+//! * `mod sim` — in-process simulator for tests and demos.
+//! * `mod dkg_envelope` — sealed-box layer for DKG round-2 packages.
 //!
 //! ## Why this works without smart contracts on Zcash
 //!
-//! Sapphire's coordination chain is a *separate* chain from Zcash. Its only
-//! purpose is to sequence sign requests, gather FROST messages between
-//! validator-signers, and produce the final signature deterministically.
-//! The resulting Zcash transaction is broadcast to Zcash L1 by whichever
-//! party wants the signed tx (typically the caller).
+//! Sapphire's coordination state is *off* Zcash. Its sole purpose is to
+//! sequence sign requests, gather FROST messages between validator-signers,
+//! and produce the final signature deterministically. The resulting Zcash
+//! transaction is broadcast to Zcash L1 by whichever party wants the signed
+//! tx (typically the caller).
 
-pub mod abci;
 pub mod dkg_envelope;
 pub mod sim;
 pub mod state;

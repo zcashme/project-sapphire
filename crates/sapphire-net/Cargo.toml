@@ -1,0 +1,24 @@
+[package]
+name = "sapphire-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire validator mesh: Noise-encrypted authenticated p2p between known peers, broadcasts Tx<C> to the deterministic state machine."
+
+[dependencies]
+sapphire-core.workspace = true
+sapphire-chain.workspace = true
+frost-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["full"] }
+snow = "0.9"
+rand.workspace = true
+rand_core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+sapphire-keygen.workspace = true
+frost-ed25519.workspace = true
+tokio = { workspace = true, features = ["full", "test-util"] }

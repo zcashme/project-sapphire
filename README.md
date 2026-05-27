@@ -7,10 +7,8 @@ coordination chain.
 
 No HTTP coordinator. No single party holds the spending key. Every step —
 key generation, request submission, FROST round-1 commitments, round-2
-rerandomized shares — flows through the chain's deterministic state
-machine. The state machine plugs straight into CometBFT via `tower-abci`.
-
-See [`SAPPHIRE.md`](./SAPPHIRE.md) for the design.
+rerandomized shares — flows through a deterministic state machine driven
+by an authenticated Noise-encrypted mesh between the validators.
 
 ## What it does
 
@@ -51,9 +49,10 @@ has no idea Sapphire produced the signature.
 | `sapphire-core` | Protocol types, FROST re-exports, ciphersuite abstraction, errors |
 | `sapphire-keygen` | Trusted-dealer + in-process DKG keygen (for offline / test setups) |
 | `sapphire-signer` | Signer node: holds a key share, runs FROST round-1/round-2 |
-| `sapphire-chain` | BFT state machine, tx types, in-memory simulator, ABCI adapter, DKG sealed-envelope layer |
-| `sapphire-validator` | Validator-signer: reacts to chain state and submits both DKG and signing txs |
-| `sapphire-zcash` | Zcash interop: drives the chain to sign Orchard sighashes; optional `pczt` feature for `orchard::pczt::Bundle` injection |
+| `sapphire-chain` | Deterministic state machine, tx types, in-memory simulator (`ChainSim`), DKG sealed-envelope layer |
+| `sapphire-validator` | Validator-signer: reacts to state and submits both DKG and signing txs |
+| `sapphire-net` | Noise-XX-encrypted authenticated mesh between validators; carries Tx<C> as opaque frames |
+| `sapphire-zcash` | Zcash interop: drives signing for Orchard sighashes; optional `pczt` feature for `orchard::pczt::Bundle` injection |
 | `sapphire-cli` | Demo CLI: `keygen`, `v1-demo` |
 | `sapphire-tests` | End-to-end integration tests |
 
@@ -61,7 +60,7 @@ has no idea Sapphire produced the signature.
 
 ```bash
 cargo build --workspace
-cargo test  --workspace     # 9 tests, all green
+cargo test  --workspace     # 10 tests, all green
 
 # Full pipeline (5-of-8) end-to-end in-process: chain-driven DKG, then
 # rerandomized RedPallas signing. Prints the block-by-block transcript and
@@ -114,35 +113,33 @@ producing a signature that verifies under `rk = ak + α·G` — which is what
 ## Tests
 
 ```
-9 passing tests:
+10 passing tests:
 
 dkg_envelope               # sealed envelope round-trip + wrong-recipient rejection (2)
 keygen                     # trusted-dealer + in-process DKG produce signable groups (2)
 v1_chain                   # 2-of-3 full chain lifecycle + reject-bad-init/unknown-request (3)
 orchard_compat             # Sapphire sig passes Orchard's actual rk-verify (1)
 dkg_over_chain             # 5-of-8 chain-driven DKG → rerandomized signing (1)
+mesh_converges             # 4 Noise-XX-meshed nodes converge on shared state (1)
 ```
 
-## ABCI mapping
+## Why no consensus engine?
 
-The state machine plugs into CometBFT via `tower-abci` with no
-re-architecture. Mapping lives in `crates/sapphire-chain/src/abci.rs`:
+The state machine is **monotonic and commutative**: each tx only adds info,
+order doesn't change correctness. So Sapphire doesn't need a BFT consensus
+algorithm — just authenticated reliable delivery between known validators.
+That's exactly what zebra-style P2P provides, and exactly what
+`sapphire-net` implements: Noise XX over TCP, 32-byte X25519 static keys
+on both sides, length-prefixed frames carrying serialized `Tx<C>`.
 
-| ABCI++ method     | Maps to                                             |
-|-------------------|-----------------------------------------------------|
-| `Info`            | App hash from `AbciApp::commit`                     |
-| `InitChain`       | `State::default()`; group seeded via first `DkgBegin` (or `InitGroup` for trusted-dealer setups) |
-| `CheckTx`         | `apply_tx(&state, &tx)` dry-run                     |
-| `FinalizeBlock`   | For each tx: `state = apply_tx(&state, &tx)?`       |
-| `Commit`          | Persist state, return app hash                      |
-| `Query`           | `state.requests.get(request_id)` / `state.group` / `state.ceremony` |
+Accountability and slashing belong on a *separate* public chain (NEAR is
+the planned anchor) where audit digests and operator bonds live. The
+inter-validator coordination doesn't.
 
 ## What's still ahead
 
 - Per-escrow demux via Zcash encrypted memo fields (validators read memos to bucket incoming notes by escrow ID)
 - Authorization / policy layer: the witness that tells validators *whether* to sign for a given request
 - Persistent key-share storage + key resharing
-- Production CometBFT deployment (drop-in: replace `ChainSim` with the `tower-abci` adapter)
+- NEAR accountability contract: validator registration, slash bond, periodic audit anchors
 - Collaborative Halo 2 proving (research-grade)
-
-See [`SAPPHIRE.md`](./SAPPHIRE.md) for the phased plan.
