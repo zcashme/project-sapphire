@@ -16,6 +16,7 @@ use frost_core::{
     round2::{self, SignatureShare},
     Ciphersuite, Identifier, SigningPackage,
 };
+use frost_rerandomized::{RandomizedCiphersuite, Randomizer};
 use rand_core::{CryptoRng, RngCore};
 
 use sapphire_core::{
@@ -87,5 +88,31 @@ impl<C: Ciphersuite> Signer<C> {
     pub fn abort(&self, session_id: &Uuid) {
         let mut pending = self.pending.lock().expect("pending lock poisoned");
         pending.remove(session_id);
+    }
+}
+
+impl<C: RandomizedCiphersuite> Signer<C> {
+    /// Round 2 for rerandomized FROST: produce a share against the
+    /// rerandomized key derived from `randomizer`. Consumes the per-session
+    /// nonces just like [`Signer::sign_share`].
+    pub fn sign_share_rerandomized(
+        &self,
+        session_id: &Uuid,
+        signing_package: &SigningPackage<C>,
+        randomizer: Randomizer<C>,
+    ) -> Result<SignatureShare<C>> {
+        let nonces = {
+            let mut pending = self.pending.lock().expect("pending lock poisoned");
+            pending.remove(session_id).ok_or(Error::SessionNotFound)?
+        };
+        #[allow(deprecated)]
+        let share = frost_rerandomized::sign::<C>(
+            signing_package,
+            &nonces,
+            &self.bundle.key_package,
+            randomizer,
+        )
+        .map_err(Error::from)?;
+        Ok(share)
     }
 }

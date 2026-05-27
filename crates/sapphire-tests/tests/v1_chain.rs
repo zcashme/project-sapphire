@@ -1,23 +1,29 @@
 //! V1 end-to-end: BFT coordination chain with validators-are-signers.
 //!
-//! Walks the full lifecycle of a signing request through the in-process
-//! chain simulator:
+//! Walks the full lifecycle of a *rerandomized* RedPallas signing request
+//! through the in-process chain simulator:
 //!
-//! 1. DKG-generate a 2-of-3 group (no trusted dealer).
+//! 1. DKG-generate a 2-of-3 RedPallas group (no trusted dealer).
 //! 2. Build 3 validator-signers.
 //! 3. `InitGroup` tx → group configured on-chain.
-//! 4. Client `SubmitRequest` tx → request in `AwaitingCommitments`.
-//! 5. Validators react → 3 `SubmitCommitment` txs.
-//! 6. Threshold (2) reached → state machine builds `SigningPackage`, advances
+//! 4. Client picks a per-request randomizer (the Orchard `α`).
+//! 5. Client `SubmitRequest` tx → request in `AwaitingCommitments`.
+//! 6. Validators react → 3 `SubmitCommitment` txs.
+//! 7. Threshold (2) reached → state machine builds `SigningPackage`, advances
 //!    to `Signing`.
-//! 7. Selected validators react → `SubmitShare` txs.
-//! 8. All shares in → state machine aggregates → `Completed { signature }`.
-//! 9. Verify signature against the group key.
+//! 8. Selected validators react → `SubmitShare` txs, each signing against the
+//!    rerandomized key derived from the on-chain randomizer.
+//! 9. All shares in → state machine aggregates via
+//!    `frost_rerandomized::aggregate` → `Completed { signature }`.
+//! 10. Verify the signature against the **rerandomized** verifying key
+//!     `rk = group_vk + α·G`, which is what Orchard's spend-auth check uses.
 
 use std::collections::BTreeSet;
 
-use frost_ed25519::Ed25519Sha512;
+use frost_core::{Ciphersuite, Field, Group};
+use frost_rerandomized::{RandomizedParams, Randomizer};
 use rand::rngs::OsRng;
+use reddsa::frost::redpallas::PallasBlake2b512;
 
 use sapphire_chain::{
     sim::ChainSim,
@@ -31,7 +37,14 @@ use sapphire_core::{
 use sapphire_keygen::generate_with_dkg;
 use sapphire_validator::Validator;
 
-type Cs = Ed25519Sha512;
+type Cs = PallasBlake2b512;
+
+/// Generate a fresh per-request randomizer. In a real Orchard flow the caller
+/// uses the `α` value from the Orchard bundle; for tests we sample one.
+fn fresh_randomizer(rng: &mut OsRng) -> Randomizer<Cs> {
+    let scalar = <<<Cs as Ciphersuite>::Group as Group>::Field as Field>::random(rng);
+    Randomizer::<Cs>::from_scalar(scalar)
+}
 
 #[test]
 fn v1_two_of_three_full_round_trip() {
@@ -61,18 +74,20 @@ fn v1_two_of_three_full_round_trip() {
     assert!(results.iter().all(|(_, r)| r.is_ok()), "InitGroup failed: {:?}", results);
     assert!(chain.state.group.is_some());
 
-    // Block 2: client submits a sign request.
+    // Block 2: client picks a randomizer and submits the request.
     let request_id = Uuid::new(&mut rng);
     let message = b"sign me on the v1 chain".to_vec();
+    let randomizer = fresh_randomizer(&mut rng);
     chain.submit(Tx::SubmitRequest {
         request_id,
         message: message.clone(),
+        randomizer,
     });
     chain.commit_block();
     let entry = chain.state.requests.get(&request_id).unwrap();
     assert!(matches!(entry.status, RequestStatus::AwaitingCommitments { .. }));
 
-    // Block 3: each validator reacts to the new request → submits commitments.
+    // Block 3: each validator reacts → submits commitments.
     for v in validators.iter_mut() {
         for tx in v.react(&chain.state, &mut rng).unwrap() {
             chain.submit(tx);
@@ -80,7 +95,6 @@ fn v1_two_of_three_full_round_trip() {
     }
     chain.commit_block();
 
-    // After threshold (2) commits land, the state machine must transition.
     let entry = chain.state.requests.get(&request_id).unwrap();
     let chosen_participants: BTreeSet<_> = match &entry.status {
         RequestStatus::Signing { participants, .. } => participants.clone(),
@@ -88,7 +102,7 @@ fn v1_two_of_three_full_round_trip() {
     };
     assert_eq!(chosen_participants.len(), 2);
 
-    // Block 4: selected validators react → submit shares.
+    // Block 4: selected validators react → submit rerandomized shares.
     for v in validators.iter_mut() {
         for tx in v.react(&chain.state, &mut rng).unwrap() {
             chain.submit(tx);
@@ -96,16 +110,20 @@ fn v1_two_of_three_full_round_trip() {
     }
     chain.commit_block();
 
-    // Final state: Completed with valid signature.
     let entry = chain.state.requests.get(&request_id).unwrap();
     let signature = match &entry.status {
         RequestStatus::Completed { signature, .. } => signature.clone(),
         other => panic!("expected Completed, got: {:?}", other),
     };
 
-    pkp.verifying_key()
+    // The signature verifies against the rerandomized verifying key —
+    // that's what an Orchard spend description's `rk` carries.
+    let randomized_params =
+        RandomizedParams::<Cs>::from_randomizer(pkp.verifying_key(), randomizer);
+    randomized_params
+        .randomized_verifying_key()
         .verify(&message, &signature)
-        .expect("signature does not verify against group key");
+        .expect("signature does not verify against rerandomized verifying key");
 }
 
 #[test]
@@ -114,7 +132,6 @@ fn v1_init_group_rejects_mismatched_validators() {
     let params = MpcParams::new(2, 3).unwrap();
     let (_, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
 
-    // Pass a fabricated validator identifier that's not in the PKP.
     let bogus: frost_core::Identifier<Cs> =
         frost_core::Identifier::try_from(99u16).unwrap();
     let mut chain = ChainSim::<Cs>::new();
@@ -147,7 +164,6 @@ fn v1_unknown_request_rejected() {
         public_key_package: pkp,
     });
     let bogus_request_id = Uuid::new(&mut rng);
-    // Trigger commit + manually retarget to a request that doesn't exist.
     let commitments = validator
         .signer
         .commit(bogus_request_id, &mut rng)

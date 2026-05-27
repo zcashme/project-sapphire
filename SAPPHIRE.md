@@ -46,27 +46,29 @@ Multiple independent parties cooperatively produce a Zcash spend-authorization s
 | Shielded proof generation | Phase 2: trusted prover with viewing key. Phase 3: collaborative Halo 2 | The Halo 2 spend/output proof |
 | Final settlement | Resulting tx broadcast to Zcash L1 | Verified by Zcash consensus like any other tx |
 
-## Current status (V0 → V1)
+## Current status (V0 → V1.1b)
 
-**Shipped in this revision** (`/Users/jules/ZcashMe/sapphire/crates/`):
-- Cargo workspace, **9 crates** (added `sapphire-chain`, `sapphire-validator`)
+**Shipped** (`/Users/jules/ZcashMe/project_sapphire/crates/`):
+- Cargo workspace, **10 crates** (`sapphire-chain`, `sapphire-validator` added at V1; `sapphire-zcash` added at V1.1b)
 - FROST signing pipeline: trusted-dealer + DKG keygen, round-1 commit, round-2 sign-share, aggregate, verify
-- **Ciphersuite-generic core** — Ed25519 (default) and **RedPallas** (Zcash Orchard) both pass full round trips
+- **Ciphersuite-generic core** — Ed25519 (default for V0 paths) and **RedPallas** (Zcash Orchard) both pass full round trips
 - **Two V0 transports** — `LocalTransport` (in-process) and `HttpTransport` (axum + reqwest)
 - **V1 BFT coordination chain** — deterministic state machine, validators-are-signers, in-process simulator
+- **V1.1 rerandomized RedPallas through the chain** — `Tx::SubmitRequest` carries a per-request `Randomizer<C>` (Orchard's α); state machine stores it on `RequestEntry`, aggregates via `frost_rerandomized::aggregate(..., &RandomizedParams::from_randomizer(group_vk, α))`. `Signer::sign_share_rerandomized` (bounded `RandomizedCiphersuite`) wraps `frost_rerandomized::sign`. Final signature verifies against `rk = ak + α·G` — what Orchard spend-auth actually checks. V1 demo + V1 test run on RedPallas, not Ed25519.
+- **V1.1b Sapphire ↔ Orchard interop** — `sapphire-zcash` crate. `drive_signing_session(chain, validators, sighash, α, rng)` runs the full BFT lifecycle for one Orchard action. With the `pczt` feature: `sign_pczt_orchard_bundle(bundle, sighash, chain, validators, rng)` walks every `orchard::pczt::Action`, drives Sapphire per action, and injects the resulting signature via `Action::apply_signature(sighash, sig)` — Orchard's own check (`rk.verify(sighash, sig)`) gates the injection. Compatibility proven by `orchard_compat` integration test which runs the **exact** verification Orchard uses (`reddsa::VerificationKey<SpendAuth>::randomize(α).verify(sighash, sig)`).
 - **ABCI adapter** — typed skeleton showing the CometBFT integration shape (no `tower-abci` dep yet)
-- CLI: `keygen`, `demo-sign`, `serve`, `http-sign`, `v1-demo`
-- **13 passing tests** across both ciphersuites, both keygen modes, both transports, and the V1 chain lifecycle
+- CLI: `keygen`, `demo-sign`, `serve`, `http-sign`, `v1-demo` (V1 demo prints α and verifies against `rk`)
+- **14 passing tests** — V0/V0.1/V0.2 paths, V1.1 chain lifecycle, V1.1b Orchard compatibility
 
 **What's not yet there (and the path to it):**
 
 | Gap | Path |
 |-----|------|
-| Rerandomized RedPallas signatures (real Orchard spend-auth) | V1.1: integrate `frost-rerandomized` with the Orchard bundle's per-spend randomizer |
-| Zcash transaction assembly | V1.1: use `zcash_client_backend` + `librustzcash` to build the spend tx around the threshold signature |
+| Full E2E PCZT round-trip (notes + proof + Sapphire sigs → broadcastable tx) | V1.1c: integration test that constructs a real Orchard PCZT (real note, real anchor, real proof via the trusted-prover model), drives `sign_pczt_orchard_bundle`, extracts the transaction via `orchard::pczt::tx_extractor`. The signing primitive itself is already done at V1.1b. |
 | Persistent key shares + rotation | V1.2: file-backed share storage with zeroize; key resharing via FROST refresh |
 | Authentication of sign requests | V1.3: ZKP-of-authorization circuit, request envelope verification on-chain |
 | **Real CometBFT deployment** | V1.4: replace `ChainSim` with a `tower-abci` adapter wrapping the same `apply_tx` |
+| Real app hash in `AbciApp::commit` | V1.4: canonical state encoding + sha256 (currently a placeholder: request count in first 8 bytes) |
 | Cross-chain & non-Zcash signing | V2: leverage NEAR Chain Signatures-style derivation for foreign-chain control |
 | MPC proof generation | V2: collaborative Halo 2 (research) |
 
@@ -85,7 +87,7 @@ Treat transparent Zcash as Bitcoin from the MPC perspective.
 
 The realistic production target. Roughly what Qedit-style institutional custody does today, but as a public network.
 
-- **Threshold spend-auth:** FROST-RedPallas (`zfnd/frost`), DKG mode (not trusted dealer)
+- **Threshold spend-auth:** FROST-RedPallas (`zfnd/frost`), DKG mode (not trusted dealer), **rerandomized per spend** — ✅ shipped at V1.1, signature verifies against `rk` as Orchard requires
 - **Trusted prover service:** holds the full viewing key (`fvk`) for the account, generates the Halo 2 proof
 - **Coordination chain:** CometBFT-based; validators run both FROST signing and the prover service
 - **Tx assembly:** `zcash_client_backend` / `librustzcash`

@@ -1,0 +1,27 @@
+[package]
+name = "sapphire-zcash"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire → Zcash interop: drive the coordination chain to produce Orchard spend-auth signatures, inject them into PCZTs."
+
+[features]
+default = []
+# Enables the `pczt` module: iterate Orchard PCZT actions, drive Sapphire
+# per-action, apply the resulting signature via `Action::apply_signature`.
+pczt = ["dep:orchard", "dep:ff"]
+
+[dependencies]
+sapphire-core.workspace = true
+sapphire-chain.workspace = true
+sapphire-validator.workspace = true
+sapphire-signer.workspace = true
+frost-core.workspace = true
+frost-rerandomized.workspace = true
+reddsa = { workspace = true, features = ["frost"] }
+rand_core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+orchard = { version = "0.13", optional = true }
+ff = { version = "0.13", optional = true }

@@ -19,10 +19,8 @@
 
 use std::collections::HashSet;
 
-use frost_core::{
-    round2,
-    Ciphersuite, Identifier,
-};
+use frost_core::{Ciphersuite, Identifier};
+use frost_rerandomized::RandomizedCiphersuite;
 use rand_core::{CryptoRng, RngCore};
 
 use sapphire_chain::{
@@ -55,10 +53,15 @@ impl<C: Ciphersuite> Validator<C> {
             shared_requests: HashSet::new(),
         }
     }
+}
 
+impl<C: RandomizedCiphersuite> Validator<C> {
     /// Inspect the current chain state and return any txs this validator
     /// should submit. Stateless w.r.t. the chain — the validator's own
     /// memory only tracks "have I already responded to this request?".
+    ///
+    /// Bounded on [`RandomizedCiphersuite`] because round-2 signing uses
+    /// the per-request randomizer stored on-chain.
     pub fn react<R: RngCore + CryptoRng>(
         &mut self,
         state: &State<C>,
@@ -77,13 +80,11 @@ impl<C: Ciphersuite> Validator<C> {
             match &entry.status {
                 RequestStatus::AwaitingCommitments { commitments } => {
                     if commitments.contains_key(&self.identifier) {
-                        // Already on-chain.
                         self.committed_requests.insert(*request_id);
                         continue;
                     }
                     if self.committed_requests.contains(request_id) {
-                        // Already submitted; the tx is in flight, just hasn't
-                        // landed yet. Don't double-submit.
+                        // Already submitted; tx in flight, don't double-submit.
                         continue;
                     }
                     let commitments = self.signer.commit(*request_id, rng)?;
@@ -109,16 +110,16 @@ impl<C: Ciphersuite> Validator<C> {
                     if self.shared_requests.contains(request_id) {
                         continue;
                     }
-                    // Use the signer's `sign_share` for consistency with V0's
-                    // local/HTTP paths. Internally that consumes the nonces
-                    // saved by `commit()`.
-                    let share = match self.signer.sign_share(request_id, signing_package) {
+                    let share = match self.signer.sign_share_rerandomized(
+                        request_id,
+                        signing_package,
+                        entry.randomizer,
+                    ) {
                         Ok(s) => s,
                         Err(Error::SessionNotFound) => {
-                            // We never committed for this one (e.g. our commit
-                            // didn't get selected before the threshold filled).
-                            // Compute a fresh nonce-less share... but we can't:
-                            // round-2 needs the round-1 nonces. So skip.
+                            // We committed but our commit wasn't in the
+                            // threshold-cut, so we have no nonces for this
+                            // request. Round 2 needs them; nothing to do.
                             tracing::debug!(
                                 validator = ?self.identifier,
                                 request = %request_id,
@@ -135,15 +136,9 @@ impl<C: Ciphersuite> Validator<C> {
                         share,
                     });
                 }
-                RequestStatus::Completed { .. } | RequestStatus::Failed { .. } => {
-                    // Nothing to do.
-                }
+                RequestStatus::Completed { .. } | RequestStatus::Failed { .. } => {}
             }
         }
         Ok(out)
     }
 }
-
-// Re-export to allow callers `use sapphire_validator::sign_share_via_signer;`
-// for advanced direct-FROST API access if they need to bypass `react`.
-pub use round2::sign as direct_round2_sign;

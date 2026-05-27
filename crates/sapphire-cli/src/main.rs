@@ -147,12 +147,17 @@ fn main() -> Result<()> {
 }
 
 fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
+    use frost_core::{Field, Group};
+    use frost_rerandomized::{RandomizedParams, Randomizer};
+    use reddsa::frost::redpallas::PallasBlake2b512 as V1Cs;
+
     let mut rng = OsRng;
     let params = MpcParams::new(threshold, total)?;
-    println!("== V1: BFT coordination chain (in-process simulator) ==\n");
+    println!("== V1: BFT coordination chain (in-process simulator) ==");
+    println!("    ciphersuite: RedPallas (Zcash Orchard spend-auth), rerandomized\n");
     println!("[setup] running DKG ({}-of-{})...", threshold, total);
-    let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng)?;
-    let mut validators: Vec<Validator<Cs>> = key_packages
+    let (key_packages, pkp) = generate_with_dkg::<V1Cs, _>(params, &mut rng)?;
+    let mut validators: Vec<Validator<V1Cs>> = key_packages
         .into_iter()
         .map(|(_, kp)| {
             Validator::new(KeyShareBundle {
@@ -162,7 +167,7 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
         })
         .collect();
     let validator_ids: Vec<_> = validators.iter().map(|v| v.identifier).collect();
-    let mut chain: ChainSim<Cs> = ChainSim::new();
+    let mut chain: ChainSim<V1Cs> = ChainSim::new();
 
     // Block 1: InitGroup
     chain.submit(ChainTx::InitGroup {
@@ -173,15 +178,25 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
     let results = chain.commit_block();
     print_block(&chain, &results, "InitGroup");
 
-    // Block 2: submit a signing request.
+    // Block 2: client picks a randomizer (stand-in for the Orchard `α`)
+    // and submits the signing request.
     let request_id = Uuid::new(&mut rng);
+    let randomizer = {
+        let scalar = <<<V1Cs as frost_core::Ciphersuite>::Group as Group>::Field as Field>::random(&mut rng);
+        Randomizer::<V1Cs>::from_scalar(scalar)
+    };
     println!(
         "\n[client] submitting signing request {} for message: {:?}",
         request_id, message
     );
+    println!(
+        "[client] randomizer (α): {}",
+        hex::encode(randomizer.serialize())
+    );
     chain.submit(ChainTx::SubmitRequest {
         request_id,
         message: message.as_bytes().to_vec(),
+        randomizer,
     });
     let results = chain.commit_block();
     print_block(&chain, &results, "SubmitRequest");
@@ -196,8 +211,8 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
     let results = chain.commit_block();
     print_block(&chain, &results, "SubmitCommitments");
 
-    // Block 4: validators react with shares.
-    println!("\n[validators] reacting → producing round-2 shares");
+    // Block 4: validators react with rerandomized shares.
+    println!("\n[validators] reacting → producing round-2 rerandomized shares");
     for v in validators.iter_mut() {
         for tx in v.react(&chain.state, &mut rng)? {
             chain.submit(tx);
@@ -206,7 +221,6 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
     let results = chain.commit_block();
     print_block(&chain, &results, "SubmitShares");
 
-    // Final.
     let entry = chain
         .state
         .requests
@@ -217,16 +231,20 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
             signature,
             participants,
         } => {
-            pkp.verifying_key()
+            // Verify against the rerandomized verifying key (Orchard `rk`).
+            let randomized_params =
+                RandomizedParams::<V1Cs>::from_randomizer(pkp.verifying_key(), randomizer);
+            randomized_params
+                .randomized_verifying_key()
                 .verify(message.as_bytes(), signature)
                 .map_err(|e| anyhow!("verification failed: {e}"))?;
             let sig_bytes = signature
                 .serialize()
                 .map_err(|e| anyhow!("serializing: {e}"))?;
             println!("\n== COMPLETED ==");
-            println!("participants: {} of {}", participants.len(), total);
-            println!("signature   : {}", hex::encode(&sig_bytes));
-            println!("verified    : ok");
+            println!("participants : {} of {}", participants.len(), total);
+            println!("signature    : {}", hex::encode(&sig_bytes));
+            println!("verified vs  : rerandomized vk (rk = ak + α·G)");
         }
         other => {
             return Err(anyhow!(

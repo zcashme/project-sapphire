@@ -1,2 +1,0 @@
-alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned, Identifier<C>, Arc<Signer<C>>, alloc::collections::btree::node::marker::LeafOrInternal>
-std::option::Option<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned, Identifier<C>, Arc<Signer<C>>, alloc::collections::btree::node::marker::LeafOrInternal>>

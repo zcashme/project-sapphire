@@ -8,6 +8,7 @@ members = [
     "crates/sapphire-client",
     "crates/sapphire-chain",
     "crates/sapphire-validator",
+    "crates/sapphire-zcash",
     "crates/sapphire-cli",
     "crates/sapphire-tests",
 ]
@@ -29,11 +30,12 @@ sapphire-coordinator = { path = "crates/sapphire-coordinator" }
 sapphire-client = { path = "crates/sapphire-client" }
 sapphire-chain = { path = "crates/sapphire-chain" }
 sapphire-validator = { path = "crates/sapphire-validator" }
+sapphire-zcash = { path = "crates/sapphire-zcash" }
 
 # FROST stack
 frost-core = { version = "2.2", features = ["serde"] }
 frost-ed25519 = { version = "2.2", features = ["serde"] }
-frost-rerandomized = "2.2"
+frost-rerandomized = { version = "2.2", features = ["serde"] }
 # RedPallas (Zcash Orchard spend-auth) — currently published on git from ZF
 # rather than crates.io; pinned to the same rev the frost-zcash-demo uses.
 reddsa = { git = "https://github.com/ZcashFoundation/reddsa.git", rev = "ed49e9ca0699a6450f6d4a9fe62ff168f5ea1ead", features = ["frost"] }

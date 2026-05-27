@@ -1,2 +1,0 @@
-fn(axum::extract::State<Arc<Signer<C>>>) -> impl Future<Output = Result<Json<InfoResp<C>>, ApiError>> {info_handler::<C>}
-fn(axum::extract::State<Arc<Signer<C>>>) -> impl Future<Output = Result<Json<InfoResp<C>>, ApiError>> {info_handler::<C>}: Handler<_, _>

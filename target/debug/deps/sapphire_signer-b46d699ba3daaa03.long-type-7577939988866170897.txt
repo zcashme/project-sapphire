@@ -1,2 +1,0 @@
-fn(axum::extract::State<Arc<Signer<C>>>, Json<CommitReq>) -> impl Future<Output = Result<Json<CommitResp<C>>, ApiError>> {commit_handler::<C>}
-fn(axum::extract::State<Arc<Signer<C>>>, Json<CommitReq>) -> impl Future<Output = Result<Json<CommitResp<C>>, ApiError>> {commit_handler::<C>}: Handler<_, _>

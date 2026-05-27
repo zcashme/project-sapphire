@@ -19,6 +19,8 @@ sapphire-chain.workspace = true
 sapphire-validator.workspace = true
 frost-core.workspace = true
 frost-ed25519.workspace = true
+frost-rerandomized.workspace = true
+reddsa = { workspace = true, features = ["frost"] }
 clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

@@ -10,12 +10,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use frost_core::{
-    aggregate,
     keys::PublicKeyPackage,
     round1::SigningCommitments,
     round2::SignatureShare,
     Ciphersuite, Identifier, Signature, SigningPackage,
 };
+use frost_rerandomized::{RandomizedParams, Randomizer};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -29,6 +29,7 @@ use crate::tx::Tx;
 pub struct RequestEntry<C: Ciphersuite> {
     pub request_id: Uuid,
     pub message: Vec<u8>,
+    pub randomizer: Randomizer<C>,
     pub status: RequestStatus<C>,
 }
 
@@ -47,7 +48,10 @@ pub enum RequestStatus<C: Ciphersuite> {
         participants: BTreeSet<Identifier<C>>,
         shares: BTreeMap<Identifier<C>, SignatureShare<C>>,
     },
-    /// Final signature aggregated and verified against the group key.
+    /// Final signature aggregated. Verifies against the *rerandomized*
+    /// verifying key `rk = group_vk + randomizer·G`, not the original group
+    /// verifying key. Callers reconstruct `rk` from `group.pkp.verifying_key()`
+    /// and the request's `randomizer`.
     Completed {
         participants: BTreeSet<Identifier<C>>,
         signature: Signature<C>,
@@ -153,6 +157,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
         Tx::SubmitRequest {
             request_id,
             message,
+            randomizer,
         } => {
             let _ = require_group(&next)?;
             if next.requests.contains_key(request_id) {
@@ -163,6 +168,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
                 RequestEntry {
                     request_id: *request_id,
                     message: message.clone(),
+                    randomizer: *randomizer,
                     status: RequestStatus::AwaitingCommitments {
                         commitments: BTreeMap::new(),
                     },
@@ -226,6 +232,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
                 .requests
                 .get_mut(request_id)
                 .ok_or(ApplyError::UnknownRequest(*request_id))?;
+            let randomizer = entry.randomizer;
             // Read what we need before mutating to keep the borrow checker happy.
             let (signing_package, participants, shares_map) = match &mut entry.status {
                 RequestStatus::Signing {
@@ -243,10 +250,20 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
             }
             shares_map.insert(*validator, share.clone());
 
-            // Once all selected participants have submitted, aggregate.
+            // Once all selected participants have submitted, aggregate
+            // against the rerandomized verifying key. The randomizer was
+            // committed to the chain by the caller in SubmitRequest, so every
+            // validator replays the same RandomizedParams here.
             if shares_map.len() == participants.len() {
                 let shares_snapshot = shares_map.clone();
-                match aggregate::<C>(&signing_package, &shares_snapshot, &group.pkp) {
+                let randomized_params =
+                    RandomizedParams::from_randomizer(group.pkp.verifying_key(), randomizer);
+                match frost_rerandomized::aggregate::<C>(
+                    &signing_package,
+                    &shares_snapshot,
+                    &group.pkp,
+                    &randomized_params,
+                ) {
                     Ok(signature) => {
                         entry.status = RequestStatus::Completed {
                             participants,
