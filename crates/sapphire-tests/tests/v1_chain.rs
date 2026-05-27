@@ -8,7 +8,7 @@
 //! 3. `InitGroup` tx → group configured on-chain.
 //! 4. Client picks a per-request randomizer (the Orchard `α`).
 //! 5. Client `SubmitRequest` tx → request in `AwaitingCommitments`.
-//! 6. Validators react → 3 `SubmitCommitment` txs.
+//! 6. Nodes react → 3 `SubmitCommitment` txs.
 //! 7. Threshold (2) reached → state machine builds `SigningPackage`, advances
 //!    to `Signing`.
 //! 8. Selected validators react → `SubmitShare` txs, each signing against the
@@ -35,7 +35,7 @@ use sapphire_core::{
     MpcParams,
 };
 use sapphire_keygen::generate_with_dkg;
-use sapphire_validator::Validator;
+use sapphire_node::Node;
 
 type Cs = PallasBlake2b512;
 
@@ -52,10 +52,10 @@ fn v1_two_of_three_full_round_trip() {
     let params = MpcParams::new(2, 3).unwrap();
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
 
-    let mut validators: Vec<Validator<Cs>> = key_packages
+    let mut validators: Vec<Node<Cs>> = key_packages
         .into_iter()
         .map(|(_, kp)| {
-            Validator::new(KeyShareBundle {
+            Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),
             })
@@ -159,13 +159,12 @@ fn v1_unknown_request_rejected() {
 
     let some_id = *key_packages.keys().next().unwrap();
     let kp = key_packages.values().next().unwrap();
-    let validator = Validator::<Cs>::new(KeyShareBundle {
+    let node = Node::<Cs>::new(KeyShareBundle {
         key_package: kp.clone(),
         public_key_package: pkp,
     });
     let bogus_request_id = Uuid::new(&mut rng);
-    let commitments = validator
-        .signer
+    let commitments = node
         .commit(bogus_request_id, &mut rng)
         .unwrap();
     chain.submit(Tx::SubmitCommitment {

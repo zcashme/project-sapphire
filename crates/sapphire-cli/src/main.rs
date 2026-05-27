@@ -16,7 +16,7 @@ use rand::rngs::OsRng;
 use sapphire_chain::{sim::ChainSim, state::RequestStatus, tx::Tx as ChainTx};
 use sapphire_core::{protocol::uuid_lite::Uuid, protocol::KeyShareBundle, MpcParams};
 use sapphire_keygen::{generate_with_dkg, generate_with_trusted_dealer};
-use sapphire_validator::{DkgParticipant, Validator};
+use sapphire_node::{DkgParticipant, Node};
 
 type Cs = Ed25519Sha512;
 
@@ -143,9 +143,9 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
         print_block(&chain, &results, label);
     }
     let pkp = chain.state.group.as_ref().unwrap().pkp.clone();
-    let mut validators: Vec<Validator<V1Cs>> = participants
+    let mut nodes: Vec<Node<V1Cs>> = participants
         .into_iter()
-        .map(|p| p.into_validator().expect("DKG complete"))
+        .map(|p| p.into_node().expect("DKG complete"))
         .collect();
 
     // Block 2: client picks a randomizer (stand-in for the Orchard `α`)
@@ -173,7 +173,7 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
 
     // Block 3: validators react with commitments.
     println!("\n[validators] reacting → producing round-1 commitments");
-    for v in validators.iter_mut() {
+    for v in nodes.iter_mut() {
         for tx in v.react(&chain.state, &mut rng)? {
             chain.submit(tx);
         }
@@ -183,7 +183,7 @@ fn cmd_v1_demo(threshold: u16, total: u16, message: &str) -> Result<()> {
 
     // Block 4: validators react with rerandomized shares.
     println!("\n[validators] reacting → producing round-2 rerandomized shares");
-    for v in validators.iter_mut() {
+    for v in nodes.iter_mut() {
         for tx in v.react(&chain.state, &mut rng)? {
             chain.submit(tx);
         }

@@ -1,13 +1,12 @@
 [package]
-name = "sapphire-validator"
+name = "sapphire-node"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Sapphire validator-signer: holds a key share and reacts to chain state by submitting FROST round txs."
+description = "Sapphire node: holds a FROST key share, runs DKG and signing rounds, reacts to chain state by submitting txs."
 
 [dependencies]
 sapphire-core.workspace = true
-sapphire-signer.workspace = true
 sapphire-chain.workspace = true
 frost-core.workspace = true
 frost-ed25519.workspace = true
@@ -18,4 +17,5 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+zeroize.workspace = true
 crypto_box.workspace = true

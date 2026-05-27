@@ -20,7 +20,7 @@ use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
 
 use sapphire_chain::sim::ChainSim;
-use sapphire_validator::Validator;
+use sapphire_node::Node;
 
 use crate::{drive_signing_session, Cs, SignError};
 
@@ -55,7 +55,7 @@ pub fn sign_pczt_orchard_bundle<R: RngCore + CryptoRng>(
     bundle: &mut PcztBundle,
     sighash: [u8; 32],
     chain: &mut ChainSim<Cs>,
-    validators: &mut [Validator<Cs>],
+    validators: &mut [Node<Cs>],
     rng: &mut R,
 ) -> Result<(), PcztSignError> {
     for (idx, action) in bundle.actions_mut().iter_mut().enumerate() {

@@ -31,7 +31,7 @@ use sapphire_chain::{
     tx::Tx,
 };
 use sapphire_core::protocol::uuid_lite::Uuid;
-use sapphire_validator::Validator;
+use sapphire_node::Node;
 
 #[cfg(feature = "pczt")]
 pub mod pczt;
@@ -75,7 +75,7 @@ impl From<ApplyError> for SignError {
 /// `orchard::pczt::Action::apply_signature`).
 pub fn drive_signing_session<R: RngCore + CryptoRng>(
     chain: &mut ChainSim<Cs>,
-    validators: &mut [Validator<Cs>],
+    validators: &mut [Node<Cs>],
     sighash: [u8; 32],
     alpha: Randomizer<Cs>,
     rng: &mut R,

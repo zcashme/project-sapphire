@@ -2,7 +2,7 @@
 //!
 //! Wraps the FROST DKG protocol so that each round's message exchange flows
 //! through the Sapphire coordination chain. The participant reacts to
-//! [`State`] just like [`crate::Validator`] does for signing:
+//! [`State`] just like [`crate::Node`] does for signing:
 //!
 //!   * sees a `ceremony` it belongs to → submits its round-1 package.
 //!   * sees round-1 complete → runs `dkg::part2`, seals each round-2 package
@@ -12,7 +12,7 @@
 //!     check, and stashes its derived [`KeyPackage`] for later promotion.
 //!
 //! Once `state.group` is `Some` (the chain promoted the agreed PKP into a
-//! [`GroupConfig`]), the caller can call [`DkgParticipant::into_validator`]
+//! [`GroupConfig`]), the caller can call [`DkgParticipant::into_node`]
 //! to drop into the normal signing flow.
 
 use std::collections::BTreeMap;
@@ -33,7 +33,7 @@ use sapphire_chain::{
 };
 use sapphire_core::protocol::KeyShareBundle;
 
-use crate::Validator;
+use crate::Node;
 
 /// One participant in a chain-driven DKG ceremony.
 pub struct DkgParticipant<C: Ciphersuite> {
@@ -237,19 +237,19 @@ impl<C: Ciphersuite> DkgParticipant<C> {
         self.key_package.is_some() && self.public_key_package.is_some()
     }
 
-    /// Consume self and produce a regular signing [`Validator`].
+    /// Consume self and produce a regular signing [`Node`].
     ///
     /// Errors if DKG hasn't completed (no key package derived locally).
-    /// Note: `RandomizedCiphersuite` isn't required to construct a Validator,
+    /// Note: `RandomizedCiphersuite` isn't required to construct a Node,
     /// only to drive the signing react loop, so this stays on `Ciphersuite`.
-    pub fn into_validator(self) -> Result<Validator<C>, DkgError> {
+    pub fn into_node(self) -> Result<Node<C>, DkgError> {
         let key_package = self
             .key_package
             .ok_or(DkgError::Inconsistent("DKG not complete: no key package"))?;
         let pkp = self
             .public_key_package
             .ok_or(DkgError::Inconsistent("DKG not complete: no PKP"))?;
-        Ok(Validator::new(KeyShareBundle {
+        Ok(Node::new(KeyShareBundle {
             key_package,
             public_key_package: pkp,
         }))

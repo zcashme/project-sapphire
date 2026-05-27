@@ -1342,7 +1342,7 @@ dependencies = [
  "sapphire-chain",
  "sapphire-core",
  "sapphire-keygen",
- "sapphire-validator",
+ "sapphire-node",
  "serde",
  "serde_json",
  "tracing",
@@ -1400,14 +1400,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "sapphire-signer"
+name = "sapphire-node"
 version = "0.1.0"
 dependencies = [
+ "crypto_box",
  "frost-core 2.2.0",
  "frost-ed25519",
  "frost-rerandomized 2.2.0",
  "rand",
  "rand_core",
+ "sapphire-chain",
  "sapphire-core",
  "serde",
  "serde_json",
@@ -1432,31 +1434,11 @@ dependencies = [
  "sapphire-core",
  "sapphire-keygen",
  "sapphire-net",
- "sapphire-signer",
- "sapphire-validator",
+ "sapphire-node",
  "sapphire-zcash",
  "serde_json",
  "tokio",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "sapphire-validator"
-version = "0.1.0"
-dependencies = [
- "crypto_box",
- "frost-core 2.2.0",
- "frost-ed25519",
- "frost-rerandomized 2.2.0",
- "rand",
- "rand_core",
- "sapphire-chain",
- "sapphire-core",
- "sapphire-signer",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tracing",
 ]
 
 [[package]]
@@ -1471,8 +1453,7 @@ dependencies = [
  "reddsa 0.5.1",
  "sapphire-chain",
  "sapphire-core",
- "sapphire-signer",
- "sapphire-validator",
+ "sapphire-node",
  "thiserror 2.0.18",
  "tracing",
 ]

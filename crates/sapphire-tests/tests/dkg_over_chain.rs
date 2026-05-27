@@ -23,7 +23,7 @@ use sapphire_chain::{
     tx::Tx as ChainTx,
 };
 use sapphire_core::{protocol::uuid_lite::Uuid, MpcParams};
-use sapphire_validator::{DkgParticipant, Validator};
+use sapphire_node::{DkgParticipant, Node};
 
 const THRESHOLD: u16 = 5;
 const TOTAL: u16 = 8;
@@ -87,9 +87,9 @@ fn five_of_eight_dkg_then_sign() {
     }
 
     // ---- Switch to signing mode ----
-    let mut validators: Vec<Validator<Cs>> = participants
+    let mut nodes: Vec<Node<Cs>> = participants
         .into_iter()
-        .map(|p| p.into_validator().expect("complete DKG → validator"))
+        .map(|p| p.into_node().expect("complete DKG → node"))
         .collect();
 
     // Client picks an Orchard-style randomizer.
@@ -108,7 +108,7 @@ fn five_of_eight_dkg_then_sign() {
     chain.commit_block();
 
     // Validators react: round-1 commitments.
-    for v in validators.iter_mut() {
+    for v in nodes.iter_mut() {
         for tx in v.react(&chain.state, &mut rng).expect("sign react r1") {
             chain.submit(tx);
         }
@@ -116,7 +116,7 @@ fn five_of_eight_dkg_then_sign() {
     chain.commit_block();
 
     // Validators react: round-2 (rerandomized) shares.
-    for v in validators.iter_mut() {
+    for v in nodes.iter_mut() {
         for tx in v.react(&chain.state, &mut rng).expect("sign react r2") {
             chain.submit(tx);
         }

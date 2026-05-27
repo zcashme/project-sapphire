@@ -48,10 +48,9 @@ has no idea Sapphire produced the signature.
 |-------|---------|
 | `sapphire-core` | Protocol types, FROST re-exports, ciphersuite abstraction, errors |
 | `sapphire-keygen` | Trusted-dealer + in-process DKG keygen (for offline / test setups) |
-| `sapphire-signer` | Signer node: holds a key share, runs FROST round-1/round-2 |
 | `sapphire-chain` | Deterministic state machine, tx types, in-memory simulator (`ChainSim`), DKG sealed-envelope layer |
-| `sapphire-validator` | Validator-signer: reacts to state and submits both DKG and signing txs |
-| `sapphire-net` | Noise-XX-encrypted authenticated mesh between validators; carries Tx<C> as opaque frames |
+| `sapphire-node` | A Sapphire node: holds a FROST key share, runs DKG + signing rounds, reacts to chain state by submitting txs |
+| `sapphire-net` | Noise-XX-encrypted authenticated mesh between nodes; carries Tx<C> as opaque frames |
 | `sapphire-zcash` | Zcash interop: drives signing for Orchard sighashes; optional `pczt` feature for `orchard::pczt::Bundle` injection |
 | `sapphire-cli` | Demo CLI: `keygen`, `v1-demo` |
 | `sapphire-tests` | End-to-end integration tests |

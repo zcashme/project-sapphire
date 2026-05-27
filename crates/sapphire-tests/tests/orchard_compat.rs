@@ -24,7 +24,7 @@ use reddsa::VerificationKey;
 use sapphire_chain::{sim::ChainSim, tx::Tx};
 use sapphire_core::{protocol::KeyShareBundle, MpcParams};
 use sapphire_keygen::generate_with_dkg;
-use sapphire_validator::Validator;
+use sapphire_node::Node;
 use sapphire_zcash::drive_signing_session;
 
 type Cs = PallasBlake2b512;
@@ -39,10 +39,10 @@ fn sapphire_signature_passes_orchard_rk_verify() {
     //    deployment, the receiver derives addresses from this `ak`; spending
     //    requires Sapphire-coordinated signing.
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
-    let mut validators: Vec<Validator<Cs>> = key_packages
+    let mut validators: Vec<Node<Cs>> = key_packages
         .into_iter()
         .map(|(_, kp)| {
-            Validator::new(KeyShareBundle {
+            Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),
             })

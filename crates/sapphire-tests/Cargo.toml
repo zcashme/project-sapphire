@@ -11,9 +11,8 @@ publish = false
 [dev-dependencies]
 sapphire-core = { workspace = true, features = ["redpallas"] }
 sapphire-keygen.workspace = true
-sapphire-signer.workspace = true
 sapphire-chain.workspace = true
-sapphire-validator.workspace = true
+sapphire-node.workspace = true
 sapphire-zcash.workspace = true
 sapphire-net.workspace = true
 frost-core.workspace = true

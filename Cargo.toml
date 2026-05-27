@@ -3,9 +3,8 @@ resolver = "2"
 members = [
     "crates/sapphire-core",
     "crates/sapphire-keygen",
-    "crates/sapphire-signer",
     "crates/sapphire-chain",
-    "crates/sapphire-validator",
+    "crates/sapphire-node",
     "crates/sapphire-zcash",
     "crates/sapphire-net",
     "crates/sapphire-cli",
@@ -24,9 +23,8 @@ description = "Decentralized MPC signing network for Zcash"
 # Local crates
 sapphire-core = { path = "crates/sapphire-core" }
 sapphire-keygen = { path = "crates/sapphire-keygen" }
-sapphire-signer = { path = "crates/sapphire-signer" }
 sapphire-chain = { path = "crates/sapphire-chain" }
-sapphire-validator = { path = "crates/sapphire-validator" }
+sapphire-node = { path = "crates/sapphire-node" }
 sapphire-zcash = { path = "crates/sapphire-zcash" }
 sapphire-net = { path = "crates/sapphire-net" }
 
