@@ -1,0 +1,27 @@
+[package]
+name = "sapphire-signer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire signer node: holds a key share and runs FROST rounds."
+
+[features]
+default = ["http"]
+http = ["dep:axum", "dep:tokio", "dep:tower-http"]
+
+[dependencies]
+sapphire-core.workspace = true
+frost-core.workspace = true
+frost-ed25519.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+zeroize.workspace = true
+
+# HTTP transport (optional)
+axum = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+tower-http = { version = "0.6", features = ["trace"], optional = true }

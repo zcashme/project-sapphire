@@ -1,0 +1,9 @@
+/Users/jules/ZcashMe/sapphire/target/debug/deps/bls12_381-e39d8559346b8dc6.d: /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/lib.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/util.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/design.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/serialization.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/scalar.rs
+
+/Users/jules/ZcashMe/sapphire/target/debug/deps/libbls12_381-e39d8559346b8dc6.rmeta: /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/lib.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/util.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/design.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/serialization.rs /Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/scalar.rs
+
+/Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/lib.rs:
+/Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/util.rs:
+/Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/design.rs:
+/Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/notes/serialization.rs:
+/Users/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bls12_381-0.8.0/src/scalar.rs:

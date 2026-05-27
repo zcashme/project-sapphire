@@ -1,0 +1,20 @@
+[package]
+name = "sapphire-chain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire coordination chain state machine: V1 'validators are signers' BFT coordination layer."
+
+[dependencies]
+sapphire-core.workspace = true
+frost-core.workspace = true
+frost-ed25519.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+
+[dev-dependencies]
+sapphire-keygen.workspace = true

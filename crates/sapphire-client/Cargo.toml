@@ -1,0 +1,27 @@
+[package]
+name = "sapphire-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire client SDK: in-process and HTTP transports for signers."
+
+[features]
+default = ["http"]
+http = ["dep:reqwest", "dep:tokio"]
+
+[dependencies]
+sapphire-core.workspace = true
+sapphire-signer.workspace = true
+sapphire-coordinator.workspace = true
+frost-core.workspace = true
+async-trait.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# HTTP transport (optional)
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

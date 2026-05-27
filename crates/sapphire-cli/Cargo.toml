@@ -1,0 +1,31 @@
+[package]
+name = "sapphire-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire demo CLI."
+
+[[bin]]
+name = "sapphire"
+path = "src/main.rs"
+
+[dependencies]
+sapphire-core.workspace = true
+sapphire-keygen.workspace = true
+sapphire-signer.workspace = true
+sapphire-coordinator.workspace = true
+sapphire-client.workspace = true
+sapphire-chain.workspace = true
+sapphire-validator.workspace = true
+frost-core.workspace = true
+frost-ed25519.workspace = true
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

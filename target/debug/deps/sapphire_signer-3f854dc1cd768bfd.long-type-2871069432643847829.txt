@@ -1,0 +1,2 @@
+fn(axum::extract::State<Arc<Signer<C>>>, axum::Json<AbortReq>) -> impl Future<Output = Result<axum::Json<serde_json::Value>, ApiError>> {abort_handler::<C>}
+fn(axum::extract::State<Arc<Signer<C>>>, axum::Json<AbortReq>) -> impl Future<Output = Result<axum::Json<serde_json::Value>, ApiError>> {abort_handler::<C>}: Handler<_, _>

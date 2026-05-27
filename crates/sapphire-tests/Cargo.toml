@@ -1,0 +1,24 @@
+[package]
+name = "sapphire-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire end-to-end integration tests."
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+sapphire-core = { workspace = true, features = ["redpallas"] }
+sapphire-keygen.workspace = true
+sapphire-signer.workspace = true
+sapphire-coordinator.workspace = true
+sapphire-client.workspace = true
+sapphire-chain.workspace = true
+sapphire-validator.workspace = true
+frost-core.workspace = true
+frost-ed25519.workspace = true
+reddsa = { workspace = true, features = ["frost"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+rand.workspace = true
+hex.workspace = true

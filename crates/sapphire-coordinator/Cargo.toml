@@ -1,0 +1,19 @@
+[package]
+name = "sapphire-coordinator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire coordinator: orchestrates FROST rounds and assembles final signatures."
+
+[dependencies]
+sapphire-core.workspace = true
+sapphire-signer.workspace = true
+frost-core.workspace = true
+frost-ed25519.workspace = true
+async-trait.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
