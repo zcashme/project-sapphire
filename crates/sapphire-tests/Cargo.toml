@@ -12,8 +12,6 @@ publish = false
 sapphire-core = { workspace = true, features = ["redpallas"] }
 sapphire-keygen.workspace = true
 sapphire-signer.workspace = true
-sapphire-coordinator.workspace = true
-sapphire-client.workspace = true
 sapphire-chain.workspace = true
 sapphire-validator.workspace = true
 sapphire-zcash.workspace = true
@@ -23,6 +21,5 @@ frost-rerandomized.workspace = true
 reddsa = { workspace = true, features = ["frost"] }
 pasta_curves = "0.5"
 ff = "0.13"
-tokio = { workspace = true, features = ["macros", "rt"] }
 rand.workspace = true
 hex.workspace = true

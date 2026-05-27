@@ -1,11 +1,10 @@
 //! Sapphire signer.
 //!
 //! A signer holds one key share of a Sapphire MPC group and produces FROST
-//! protocol messages on request from the coordinator. This is a *library*;
-//! `sapphire-cli` wraps it with an HTTP or in-process transport.
-
-#[cfg(feature = "http")]
-pub mod server;
+//! protocol messages. In the chain-driven Sapphire architecture, each
+//! validator owns one [`Signer`] and reacts to chain state by submitting
+//! commitments / shares back as on-chain transactions; the library itself
+//! does no networking.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
