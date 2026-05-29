@@ -5,9 +5,8 @@
 //! exchanged through `BTreeMap`s rather than the network.
 //!
 //! This is the same protocol a fully distributed Sapphire DKG ceremony would
-//! run; the only thing changed is the transport. The output — a [`KeyPackage`]
-//! per participant plus a shared [`PublicKeyPackage`] — is indistinguishable
-//! from trusted-dealer output to downstream signing code.
+//! run; the only thing changed is the transport. The output is a
+//! [`KeyPackage`] per participant plus a shared [`PublicKeyPackage`].
 //!
 //! **Security property:** No participant ever sees another participant's
 //! secret polynomial coefficients. The reconstructable secret is never
@@ -28,8 +27,7 @@ use sapphire_core::{Error, MpcParams, Result};
 
 /// Run the FROST DKG protocol in-process for `params.total` participants.
 ///
-/// Returns the same shape as [`crate::trusted_dealer::generate_with_trusted_dealer`]:
-/// one [`KeyPackage`] per participant + the shared [`PublicKeyPackage`].
+/// Returns one [`KeyPackage`] per participant + the shared [`PublicKeyPackage`].
 ///
 /// Each participant uses an identifier from `1..=total` (FROST's default).
 pub fn generate_with_dkg<C: Ciphersuite, R: RngCore + CryptoRng>(

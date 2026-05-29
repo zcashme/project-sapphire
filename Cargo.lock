@@ -1355,11 +1355,9 @@ name = "sapphire-core"
 version = "0.1.0"
 dependencies = [
  "frost-core 2.2.0",
- "frost-ed25519",
  "hex",
  "rand",
  "rand_core",
- "reddsa 0.5.1",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

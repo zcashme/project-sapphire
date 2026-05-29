@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 
 [dev-dependencies]
-sapphire-core = { workspace = true, features = ["redpallas"] }
+sapphire-core.workspace = true
 sapphire-keygen.workspace = true
 sapphire-chain.workspace = true
 sapphire-node.workspace = true

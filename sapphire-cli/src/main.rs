@@ -15,7 +15,7 @@ use rand::rngs::OsRng;
 
 use sapphire_chain::{sim::ChainSim, state::RequestStatus, tx::Tx as ChainTx};
 use sapphire_core::{protocol::uuid_lite::Uuid, protocol::KeyShareBundle, MpcParams};
-use sapphire_keygen::{generate_with_dkg, generate_with_trusted_dealer};
+use sapphire_keygen::generate_with_dkg;
 use sapphire_node::{DkgParticipant, Node};
 
 type Cs = Ed25519Sha512;
@@ -29,7 +29,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Generate a `threshold`-of-`total` group.
+    /// Generate a `threshold`-of-`total` group via DKG (no single party ever
+    /// sees the full key).
     Keygen {
         #[arg(long)]
         threshold: u16,
@@ -37,10 +38,6 @@ enum Cmd {
         total: u16,
         #[arg(long)]
         out: PathBuf,
-        /// Use distributed key generation (no single party sees the full key).
-        /// Defaults to trusted-dealer for backwards-compatible quick demos.
-        #[arg(long, default_value_t = false)]
-        dkg: bool,
     },
 
     /// V1 demo: run the full BFT-coordination-chain pipeline in-process.
@@ -78,8 +75,7 @@ fn main() -> Result<()> {
             threshold,
             total,
             out,
-            dkg,
-        } => cmd_keygen(threshold, total, &out, dkg),
+        } => cmd_keygen(threshold, total, &out),
         Cmd::V1Demo {
             threshold,
             total,
@@ -391,16 +387,11 @@ fn print_verdict(
     Ok(())
 }
 
-fn cmd_keygen(threshold: u16, total: u16, out: &Path, dkg: bool) -> Result<()> {
+fn cmd_keygen(threshold: u16, total: u16, out: &Path) -> Result<()> {
     let params = MpcParams::new(threshold, total)?;
     let mut rng = OsRng;
-    let (key_packages, pkp) = if dkg {
-        println!("running DKG ({}-of-{})...", threshold, total);
-        generate_with_dkg::<Cs, _>(params, &mut rng)?
-    } else {
-        println!("running trusted dealer keygen ({}-of-{})...", threshold, total);
-        generate_with_trusted_dealer::<Cs, _>(params, &mut rng)?
-    };
+    println!("running DKG ({}-of-{})...", threshold, total);
+    let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng)?;
 
     std::fs::create_dir_all(out)
         .with_context(|| format!("creating {}", out.display()))?;

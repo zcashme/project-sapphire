@@ -5,18 +5,8 @@ edition.workspace = true
 license.workspace = true
 description = "Sapphire core: protocol types, FROST ciphersuite abstraction, errors."
 
-[features]
-default = []
-# Re-export the RedPallas ciphersuite (Zcash Orchard spend-auth).
-# Note: this enables the *plain* RedPallas FROST ciphersuite. Production Zcash
-# spend authorization additionally requires *rerandomization* (the `re_randomized_seed`
-# from the bundle's randomizer); that integration lives in V0.3.
-redpallas = ["dep:reddsa"]
-
 [dependencies]
 frost-core.workspace = true
-frost-ed25519.workspace = true
-reddsa = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
