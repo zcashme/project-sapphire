@@ -48,9 +48,7 @@ fn group_with_escrow_policy(rng: &mut OsRng) -> (ChainSim<Cs>, Vec<Node<Cs>>, sa
     let params = MpcParams::new(2, 3).unwrap();
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, rng).unwrap();
 
-    let validators: Vec<Node<Cs>> = key_packages
-        .into_iter()
-        .map(|(_, kp)| {
+    let validators: Vec<Node<Cs>> = key_packages.into_values().map(|kp| {
             Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),
@@ -118,7 +116,7 @@ fn valid_release_is_signed() {
 
     let entry = chain.state.requests.get(&request_id).unwrap();
     let signature = match &entry.status {
-        RequestStatus::Completed { signature, .. } => signature.clone(),
+        RequestStatus::Completed { signature, .. } => *signature,
         other => panic!("expected Completed for a valid release, got: {:?}", other),
     };
     // The signature authorizes exactly these bytes, under the rerandomized key.
@@ -212,9 +210,7 @@ fn default_node_still_signs_arbitrary_messages() {
     let mut rng = OsRng;
     let params = MpcParams::new(2, 3).unwrap();
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
-    let mut validators: Vec<Node<Cs>> = key_packages
-        .into_iter()
-        .map(|(_, kp)| {
+    let mut validators: Vec<Node<Cs>> = key_packages.into_values().map(|kp| {
             Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),

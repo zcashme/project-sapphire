@@ -39,9 +39,7 @@ fn sapphire_signature_passes_orchard_rk_verify() {
     //    deployment, the receiver derives addresses from this `ak`; spending
     //    requires Sapphire-coordinated signing.
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
-    let mut validators: Vec<Node<Cs>> = key_packages
-        .into_iter()
-        .map(|(_, kp)| {
+    let mut validators: Vec<Node<Cs>> = key_packages.into_values().map(|kp| {
             Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),

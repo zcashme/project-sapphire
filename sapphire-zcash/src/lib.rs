@@ -112,7 +112,7 @@ pub fn drive_signing_session<R: RngCore + CryptoRng>(
             .get(&request_id)
             .ok_or(SignError::RequestMissing)?;
         match &entry.status {
-            RequestStatus::Completed { signature, .. } => return Ok(signature.clone()),
+            RequestStatus::Completed { signature, .. } => return Ok(*signature),
             RequestStatus::Failed { reason } => {
                 return Err(SignError::AggregationFailed(reason.clone()))
             }

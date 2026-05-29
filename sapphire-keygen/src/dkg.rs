@@ -25,6 +25,10 @@ use rand_core::{CryptoRng, RngCore};
 
 use sapphire_core::{Error, MpcParams, Result};
 
+/// The output of a keygen ceremony: one [`KeyPackage`] per participant
+/// (keyed by identifier) plus the shared [`PublicKeyPackage`].
+pub type GroupKeys<C> = (BTreeMap<Identifier<C>, KeyPackage<C>>, PublicKeyPackage<C>);
+
 /// Run the FROST DKG protocol in-process for `params.total` participants.
 ///
 /// Returns one [`KeyPackage`] per participant + the shared [`PublicKeyPackage`].
@@ -33,10 +37,7 @@ use sapphire_core::{Error, MpcParams, Result};
 pub fn generate_with_dkg<C: Ciphersuite, R: RngCore + CryptoRng>(
     params: MpcParams,
     rng: &mut R,
-) -> Result<(
-    BTreeMap<Identifier<C>, KeyPackage<C>>,
-    PublicKeyPackage<C>,
-)> {
+) -> Result<GroupKeys<C>> {
     let total = params.total;
     let threshold = params.threshold;
 

@@ -52,9 +52,7 @@ fn v1_two_of_three_full_round_trip() {
     let params = MpcParams::new(2, 3).unwrap();
     let (key_packages, pkp) = generate_with_dkg::<Cs, _>(params, &mut rng).unwrap();
 
-    let mut validators: Vec<Node<Cs>> = key_packages
-        .into_iter()
-        .map(|(_, kp)| {
+    let mut validators: Vec<Node<Cs>> = key_packages.into_values().map(|kp| {
             Node::new(KeyShareBundle {
                 key_package: kp,
                 public_key_package: pkp.clone(),
@@ -112,7 +110,7 @@ fn v1_two_of_three_full_round_trip() {
 
     let entry = chain.state.requests.get(&request_id).unwrap();
     let signature = match &entry.status {
-        RequestStatus::Completed { signature, .. } => signature.clone(),
+        RequestStatus::Completed { signature, .. } => *signature,
         other => panic!("expected Completed, got: {:?}", other),
     };
 
@@ -141,7 +139,7 @@ fn v1_init_group_rejects_mismatched_validators() {
         validators: vec![bogus],
     });
     let results = chain.commit_block();
-    assert!(matches!(results[0].1, Err(_)), "expected mismatch error");
+    assert!(results[0].1.is_err(), "expected mismatch error");
 }
 
 #[test]
@@ -173,5 +171,5 @@ fn v1_unknown_request_rejected() {
         commitments,
     });
     let results = chain.commit_block();
-    assert!(matches!(results[0].1, Err(_)));
+    assert!(results[0].1.is_err());
 }

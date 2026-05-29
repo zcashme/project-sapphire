@@ -373,7 +373,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
                     if map.contains_key(validator) {
                         return Err(ApplyError::DuplicateCommitment);
                     }
-                    map.insert(*validator, commitments.clone());
+                    map.insert(*validator, *commitments);
 
                     // If we've reached threshold, transition to Signing using
                     // the first `threshold` commits in identifier order. This
@@ -382,7 +382,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
                         let chosen: BTreeMap<_, _> = map
                             .iter()
                             .take(group.params.threshold as usize)
-                            .map(|(k, v)| (*k, v.clone()))
+                            .map(|(k, v)| (*k, *v))
                             .collect();
                         let participants: BTreeSet<_> = chosen.keys().copied().collect();
                         let signing_package = SigningPackage::<C>::new(chosen, &message);
@@ -426,7 +426,7 @@ pub fn apply_tx<C: Ciphersuite>(state: &State<C>, tx: &Tx<C>) -> Result<State<C>
             if shares_map.contains_key(validator) {
                 return Err(ApplyError::DuplicateShare);
             }
-            shares_map.insert(*validator, share.clone());
+            shares_map.insert(*validator, *share);
 
             // Once all selected participants have submitted, aggregate
             // against the rerandomized verifying key. The randomizer was
