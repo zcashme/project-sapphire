@@ -1,14 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/sapphire-core",
-    "crates/sapphire-keygen",
-    "crates/sapphire-chain",
-    "crates/sapphire-node",
-    "crates/sapphire-zcash",
-    "crates/sapphire-net",
-    "crates/sapphire-cli",
-    "crates/sapphire-tests",
+    "sapphire-core",
+    "sapphire-keygen",
+    "sapphire-chain",
+    "sapphire-node",
+    "sapphire-zcash",
+    "sapphire-net",
+    "sapphire-cli",
+    "sapphire-tests",
 ]
 
 [workspace.package]
@@ -21,12 +21,12 @@ description = "Decentralized MPC signing network for Zcash"
 
 [workspace.dependencies]
 # Local crates
-sapphire-core = { path = "crates/sapphire-core" }
-sapphire-keygen = { path = "crates/sapphire-keygen" }
-sapphire-chain = { path = "crates/sapphire-chain" }
-sapphire-node = { path = "crates/sapphire-node" }
-sapphire-zcash = { path = "crates/sapphire-zcash" }
-sapphire-net = { path = "crates/sapphire-net" }
+sapphire-core = { path = "sapphire-core" }
+sapphire-keygen = { path = "sapphire-keygen" }
+sapphire-chain = { path = "sapphire-chain" }
+sapphire-node = { path = "sapphire-node" }
+sapphire-zcash = { path = "sapphire-zcash" }
+sapphire-net = { path = "sapphire-net" }
 
 # FROST stack
 frost-core = { version = "2.2", features = ["serde"] }
