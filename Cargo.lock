@@ -1341,6 +1341,7 @@ dependencies = [
  "reddsa 0.5.1",
  "sapphire-chain",
  "sapphire-core",
+ "sapphire-escrow",
  "sapphire-keygen",
  "sapphire-node",
  "serde",
@@ -1364,6 +1365,16 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "sapphire-escrow"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "sha2",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

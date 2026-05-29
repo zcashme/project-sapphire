@@ -57,6 +57,11 @@ enum Cmd {
         #[arg(long, default_value = "hello sapphire v1 chain")]
         message: String,
     },
+
+    /// Interactive oracle: assemble an escrow release/refund, run the
+    /// validation predicate over it, and emit the settlement intent that a
+    /// relayer would wrap in a two-action PCZT and submit to the 5-of-8.
+    Oracle,
 }
 
 fn main() -> Result<()> {
@@ -80,6 +85,7 @@ fn main() -> Result<()> {
             total,
             message,
         } => cmd_v1_demo(threshold, total, &message),
+        Cmd::Oracle => cmd_oracle(),
     }
 }
 
@@ -244,6 +250,145 @@ fn print_block<C: frost_core::Ciphersuite>(
         };
         println!("  tx#{}: {}", i, status);
     }
+}
+
+/// Read a line from stdin, showing `default` in brackets; empty input keeps it.
+fn prompt(label: &str, default: &str) -> Result<String> {
+    use std::io::{self, Write};
+    if default.is_empty() {
+        print!("  {label}: ");
+    } else {
+        print!("  {label} [{default}]: ");
+    }
+    io::stdout().flush().ok();
+    let mut line = String::new();
+    io::stdin().read_line(&mut line)?;
+    let s = line.trim().to_string();
+    Ok(if s.is_empty() {
+        default.to_string()
+    } else {
+        s
+    })
+}
+
+fn prompt_u64(label: &str, default: u64) -> Result<u64> {
+    let s = prompt(label, &default.to_string())?;
+    s.parse::<u64>().with_context(|| format!("'{s}' is not a number"))
+}
+
+/// Interactive oracle: assemble an escrow release/refund and run Sapphire's
+/// validation predicate over it. This is the *oracle/relayer* role — the party
+/// that proposes a settlement. The structured intent it emits here is exactly
+/// what gets encoded into the two-action PCZT and handed to the 5-of-8 (who
+/// re-validate it independently before signing).
+fn cmd_oracle() -> Result<()> {
+    use sapphire_escrow::{
+        validate_refund, validate_settlement, verifiers::HashPreimage, Address, EscrowTerms,
+        PaymentLeg, RefundIntent, SettlementIntent, Zatoshis,
+    };
+
+    println!("== Sapphire oracle: escrow settlement builder ==");
+    println!("   Proposes a release/refund; Sapphire validators re-check it before signing.\n");
+
+    println!("-- escrow terms (the binding reference funds were locked under) --");
+    let amount = prompt_u64("escrowed amount (zatoshis)", 800_000_000)?;
+    let payee = prompt("payee (release recipient)", "u_alice")?;
+    let refund_to = prompt("refund recipient", "u_bob")?;
+    let timeout_height = prompt_u64("timeout height", 1000)?;
+
+    // Lock the escrow with a hash-preimage (HTLC-style) condition: the
+    // `condition` is the SHA-256 digest of a secret. Revealing the secret
+    // unlocks the release. This is application-agnostic — no ZNS involved.
+    println!("\n-- release condition: hash-preimage (HTLC) --");
+    let secret = prompt("lock secret (preimage the escrow commits to)", "open sesame")?;
+    let digest = HashPreimage::digest(secret.as_bytes());
+    println!("  → condition (sha256 digest): {}", hex::encode(digest));
+
+    let terms = EscrowTerms {
+        escrow_id: [7u8; 32],
+        amount: Zatoshis(amount),
+        payee: Address(payee.clone()),
+        refund_to: Address(refund_to.clone()),
+        timeout_height,
+        condition: digest.to_vec(),
+    };
+
+    println!("\n-- which settlement is the oracle proposing? --");
+    let action = prompt("action (release / refund)", "release")?;
+
+    match action.as_str() {
+        "release" => {
+            println!("\n-- assemble release --");
+            let to = prompt("pay to", &payee)?;
+            let pay_amount = prompt_u64("pay amount (zatoshis)", amount)?;
+            let revealed = prompt("revealed preimage (witness)", &secret)?;
+
+            let intent = SettlementIntent {
+                payment: PaymentLeg {
+                    amount: Zatoshis(pay_amount),
+                    to: Address(to),
+                },
+                witness: revealed.into_bytes(),
+            };
+
+            let result = validate_settlement(&terms, &intent, &HashPreimage);
+            print_verdict(&terms, "release", &result)?;
+            let payment_json = serde_json::to_value(&intent.payment)?;
+            println!("\n  settlement intent (→ leg A of the PCZT):");
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "payment": payment_json,
+                    "witness_hex": hex::encode(&intent.witness),
+                }))?
+            );
+            if result.is_err() {
+                std::process::exit(1);
+            }
+        }
+        "refund" => {
+            println!("\n-- assemble refund --");
+            let to = prompt("refund to", &refund_to)?;
+            let pay_amount = prompt_u64("refund amount (zatoshis)", amount)?;
+            let current_height = prompt_u64("current block height", timeout_height)?;
+
+            let intent = RefundIntent {
+                payment: PaymentLeg {
+                    amount: Zatoshis(pay_amount),
+                    to: Address(to),
+                },
+            };
+
+            let result = validate_refund(&terms, &intent, current_height);
+            print_verdict(&terms, "refund", &result)?;
+            println!("\n  refund intent:");
+            println!("{}", serde_json::to_string_pretty(&intent.payment)?);
+            if result.is_err() {
+                std::process::exit(1);
+            }
+        }
+        other => return Err(anyhow!("unknown action '{other}' (expected release/refund)")),
+    }
+
+    Ok(())
+}
+
+fn print_verdict(
+    terms: &sapphire_escrow::EscrowTerms,
+    kind: &str,
+    result: &std::result::Result<(), sapphire_escrow::EscrowError>,
+) -> Result<()> {
+    println!("\n-- escrow terms --");
+    println!("{}", serde_json::to_string_pretty(terms)?);
+    match result {
+        Ok(()) => println!(
+            "\n  VERDICT: ✔ ACCEPT — a validator would sign this {kind}."
+        ),
+        Err(e) => println!(
+            "\n  VERDICT: ✘ REJECT — no signature. reason: {e}"
+        ),
+    }
+    Ok(())
 }
 
 fn cmd_keygen(threshold: u16, total: u16, out: &Path, dkg: bool) -> Result<()> {

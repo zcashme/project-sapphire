@@ -4,6 +4,7 @@ members = [
     "sapphire-core",
     "sapphire-keygen",
     "sapphire-chain",
+    "sapphire-escrow",
     "sapphire-node",
     "sapphire-zcash",
     "sapphire-net",
@@ -24,6 +25,7 @@ description = "Decentralized MPC signing network for Zcash"
 sapphire-core = { path = "sapphire-core" }
 sapphire-keygen = { path = "sapphire-keygen" }
 sapphire-chain = { path = "sapphire-chain" }
+sapphire-escrow = { path = "sapphire-escrow" }
 sapphire-node = { path = "sapphire-node" }
 sapphire-zcash = { path = "sapphire-zcash" }
 sapphire-net = { path = "sapphire-net" }

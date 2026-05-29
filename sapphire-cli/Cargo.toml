@@ -13,6 +13,7 @@ path = "src/main.rs"
 sapphire-core.workspace = true
 sapphire-keygen.workspace = true
 sapphire-chain.workspace = true
+sapphire-escrow.workspace = true
 sapphire-node.workspace = true
 frost-core.workspace = true
 frost-ed25519.workspace = true

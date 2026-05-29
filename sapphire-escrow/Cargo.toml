@@ -1,0 +1,12 @@
+[package]
+name = "sapphire-escrow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sapphire escrow: the condition-gated validation layer for threshold-signed release."
+
+[dependencies]
+serde.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+sha2 = "0.10"
