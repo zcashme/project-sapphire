@@ -1,76 +1,13 @@
-//! On-the-wire protocol types.
+//! Shared protocol types.
 //!
-//! These are the request/response envelopes that flow between client →
-//! coordinator → signers. Generic over the FROST `Ciphersuite` so the same
-//! protocol works for Ed25519 (default), RedPallas (Zcash Orchard), or any
-//! other supported scheme.
+//! Generic over the FROST `Ciphersuite` so the same types serve Ed25519
+//! (tests) or RedPallas (Zcash Orchard spend-auth).
 
-use frost_core::{
-    keys::PublicKeyPackage,
-    round1::SigningCommitments,
-    round2::SignatureShare,
-    Ciphersuite, Identifier, Signature,
-};
+use frost_core::{keys::PublicKeyPackage, Ciphersuite};
 use serde::{Deserialize, Serialize};
 
-/// A request for the network to produce a signature over `message`.
-///
-/// In V0 this is unauthenticated. V0.2+ adds a `auth_zkp` field carrying a
-/// proof that the caller is authorized to request a signature under this
-/// derivation path / policy.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "C: Ciphersuite")]
-pub struct SigningRequest<C: Ciphersuite> {
-    /// Unique request ID. Used to dedupe and route response.
-    pub request_id: uuid_lite::Uuid,
-    /// Message bytes to be signed.
-    #[serde(with = "hex::serde")]
-    pub message: Vec<u8>,
-    /// Public key package identifying the group key.
-    pub group_pubkey: PublicKeyPackage<C>,
-    /// Identifiers of the signers the coordinator selected to participate.
-    pub participants: Vec<Identifier<C>>,
-}
-
-/// A completed signature produced by the network.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "C: Ciphersuite")]
-pub struct SigningResponse<C: Ciphersuite> {
-    pub request_id: uuid_lite::Uuid,
-    pub signature: Signature<C>,
-}
-
-/// Round-1 message: per-signer commitment.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "C: Ciphersuite")]
-pub struct Round1Message<C: Ciphersuite> {
-    pub participant: Identifier<C>,
-    pub commitments: SigningCommitments<C>,
-}
-
-/// Round-2 message: per-signer signature share.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "C: Ciphersuite")]
-pub struct Round2Message<C: Ciphersuite> {
-    pub participant: Identifier<C>,
-    pub share: SignatureShare<C>,
-}
-
-/// Re-exports so downstream crates don't have to depend on frost-core directly.
-pub mod frost_types {
-    pub use frost_core::{
-        keys::{KeyPackage, PublicKeyPackage, SecretShare},
-        round1::{SigningCommitments, SigningNonces},
-        round2::SignatureShare,
-        Identifier, Signature, SigningPackage, VerifyingKey,
-    };
-    pub use frost_core::Ciphersuite;
-}
-
-/// Minimal UUID-lite shim so we don't pull in the full `uuid` crate just for IDs.
-///
-/// V0 uses random 16-byte IDs encoded as hex. We can swap in the real `uuid`
-/// crate if/when it earns its weight.
+/// Minimal UUID-lite shim so we don't pull in the full `uuid` crate just for
+/// IDs: a random 16-byte value encoded as hex.
 pub mod uuid_lite {
     use rand::RngCore;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -117,17 +54,10 @@ pub mod uuid_lite {
 }
 
 /// Holds a signer's secret key share alongside the group's public key package.
-/// Persisted to disk by the signer node.
+/// Persisted to disk by the node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "C: Ciphersuite")]
 pub struct KeyShareBundle<C: Ciphersuite> {
     pub key_package: frost_core::keys::KeyPackage<C>,
     pub public_key_package: PublicKeyPackage<C>,
-}
-
-/// In-flight signing nonces. The signer holds onto these between rounds.
-/// They MUST NOT be reused across signing sessions.
-#[derive(Debug)]
-pub struct PendingNonces<C: Ciphersuite> {
-    pub nonces: frost_core::round1::SigningNonces<C>,
 }

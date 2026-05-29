@@ -8,7 +8,6 @@ description = "Sapphire coordination chain state machine: V1 'validators are sig
 [dependencies]
 sapphire-core.workspace = true
 frost-core.workspace = true
-frost-ed25519.workspace = true
 frost-rerandomized.workspace = true
 serde.workspace = true
 serde_json.workspace = true

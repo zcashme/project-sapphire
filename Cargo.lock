@@ -1315,7 +1315,6 @@ version = "0.1.0"
 dependencies = [
  "crypto_box",
  "frost-core 2.2.0",
- "frost-ed25519",
  "frost-rerandomized 2.2.0",
  "rand",
  "rand_core",
@@ -1357,12 +1356,9 @@ dependencies = [
  "frost-core 2.2.0",
  "hex",
  "rand",
- "rand_core",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "tracing",
- "zeroize",
 ]
 
 [[package]]
@@ -1394,7 +1390,6 @@ name = "sapphire-net"
 version = "0.1.0"
 dependencies = [
  "frost-core 2.2.0",
- "frost-ed25519",
  "rand",
  "rand_core",
  "sapphire-chain",
@@ -1414,7 +1409,6 @@ version = "0.1.0"
 dependencies = [
  "crypto_box",
  "frost-core 2.2.0",
- "frost-ed25519",
  "frost-rerandomized 2.2.0",
  "hex",
  "rand",

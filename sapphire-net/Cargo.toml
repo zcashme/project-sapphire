@@ -20,5 +20,4 @@ tracing.workspace = true
 
 [dev-dependencies]
 sapphire-keygen.workspace = true
-frost-ed25519.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }

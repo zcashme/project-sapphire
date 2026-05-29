@@ -12,6 +12,3 @@ serde_json.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 rand.workspace = true
-rand_core.workspace = true
-tracing.workspace = true
-zeroize.workspace = true
