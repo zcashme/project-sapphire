@@ -3,7 +3,7 @@ name = "sapphire-keygen"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Sapphire keygen: trusted-dealer and (future) DKG ceremonies."
+description = "Sapphire keygen: distributed key generation (DKG) ceremonies."
 
 [dependencies]
 sapphire-core.workspace = true
@@ -11,6 +11,3 @@ frost-core.workspace = true
 frost-ed25519.workspace = true
 rand.workspace = true
 rand_core.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true

@@ -1321,7 +1321,6 @@ dependencies = [
  "sapphire-core",
  "sapphire-keygen",
  "serde",
- "serde_json",
  "thiserror 2.0.18",
  "tracing",
 ]
@@ -1343,9 +1342,7 @@ dependencies = [
  "sapphire-escrow",
  "sapphire-keygen",
  "sapphire-node",
- "serde",
  "serde_json",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -1380,22 +1377,13 @@ dependencies = [
  "rand",
  "rand_core",
  "sapphire-core",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "sapphire-net"
 version = "0.1.0"
 dependencies = [
- "frost-core 2.2.0",
- "rand",
- "rand_core",
- "sapphire-chain",
- "sapphire-core",
  "sapphire-keygen",
- "serde",
  "serde_json",
  "snow",
  "thiserror 2.0.18",
@@ -1411,7 +1399,6 @@ dependencies = [
  "frost-core 2.2.0",
  "frost-rerandomized 2.2.0",
  "hex",
- "rand",
  "rand_core",
  "sapphire-chain",
  "sapphire-core",
@@ -1420,7 +1407,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tracing",
- "zeroize",
 ]
 
 [[package]]
@@ -1455,14 +1441,12 @@ dependencies = [
  "frost-core 2.2.0",
  "frost-rerandomized 2.2.0",
  "orchard",
- "rand",
  "rand_core",
  "reddsa 0.5.1",
  "sapphire-chain",
  "sapphire-core",
  "sapphire-node",
  "thiserror 2.0.18",
- "tracing",
 ]
 
 [[package]]
