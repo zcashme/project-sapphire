@@ -100,6 +100,20 @@ pub struct RefundIntent {
     pub payment: PaymentLeg,
 }
 
+/// A release request as it travels to the signers: "release escrow `escrow_id`
+/// per `intent`." The signed message bytes are this, serialized.
+///
+/// The proposal names the escrow by id but does **not** carry the terms — a
+/// validator looks up its *own* trusted [`EscrowTerms`] for `escrow_id` and
+/// validates `intent` against those. Taking terms from the proposal would be
+/// circular (a malicious proposer would just supply terms matching its theft).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleaseProposal<W> {
+    #[serde(with = "hex::serde")]
+    pub escrow_id: [u8; 32],
+    pub intent: SettlementIntent<W>,
+}
+
 /// Injected capability: decide whether an escrow's release condition is met.
 ///
 /// Sapphire core never interprets the condition; it hands the verifier the

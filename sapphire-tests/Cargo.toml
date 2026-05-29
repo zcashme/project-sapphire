@@ -12,6 +12,7 @@ publish = false
 sapphire-core.workspace = true
 sapphire-keygen.workspace = true
 sapphire-chain.workspace = true
+sapphire-escrow.workspace = true
 sapphire-node.workspace = true
 sapphire-zcash.workspace = true
 sapphire-net.workspace = true

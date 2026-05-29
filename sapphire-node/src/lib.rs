@@ -11,8 +11,10 @@
 //! an implementation detail.
 
 pub mod dkg;
+pub mod policy;
 
 pub use dkg::{DkgError, DkgParticipant};
+pub use policy::{AcceptAll, EscrowPolicy, SignPolicy};
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -47,6 +49,9 @@ pub struct Node<C: Ciphersuite> {
     committed_requests: HashSet<Uuid>,
     /// Requests we've already produced a share for.
     shared_requests: HashSet<Uuid>,
+    /// The gate consulted before signing. Default [`AcceptAll`] (blind signer);
+    /// set [`Node::with_policy`] to make this a validating signer.
+    policy: Box<dyn SignPolicy>,
 }
 
 impl<C: Ciphersuite> Node<C> {
@@ -58,7 +63,15 @@ impl<C: Ciphersuite> Node<C> {
             pending: Mutex::new(HashMap::new()),
             committed_requests: HashSet::new(),
             shared_requests: HashSet::new(),
+            policy: Box::new(AcceptAll),
         }
+    }
+
+    /// Install a signing policy (e.g. [`EscrowPolicy`]) so this node validates
+    /// each request before contributing a share, refusing those that fail.
+    pub fn with_policy(mut self, policy: impl SignPolicy + 'static) -> Self {
+        self.policy = Box::new(policy);
+        self
     }
 
     pub fn identifier(&self) -> Identifier<C> {
@@ -140,6 +153,19 @@ impl<C: RandomizedCiphersuite> Node<C> {
                     }
                     if self.committed_requests.contains(request_id) {
                         // Already submitted; tx in flight, don't double-submit.
+                        continue;
+                    }
+                    // The validation gate: refuse to sign anything that doesn't
+                    // pass policy. Emit nothing — no commitment, so this node's
+                    // share can never form part of the threshold for a bad
+                    // request.
+                    if let Err(reason) = self.policy.approve(&entry.message) {
+                        tracing::warn!(
+                            node = ?self.identifier,
+                            request = %request_id,
+                            %reason,
+                            "refusing to sign: policy rejected the request"
+                        );
                         continue;
                     }
                     let commitments = self.commit(*request_id, rng)?;

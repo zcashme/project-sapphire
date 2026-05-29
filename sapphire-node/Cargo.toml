@@ -8,6 +8,7 @@ description = "Sapphire node: holds a FROST key share, runs DKG and signing roun
 [dependencies]
 sapphire-core.workspace = true
 sapphire-chain.workspace = true
+sapphire-escrow.workspace = true
 frost-core.workspace = true
 frost-ed25519.workspace = true
 frost-rerandomized.workspace = true
@@ -15,6 +16,7 @@ rand.workspace = true
 rand_core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+hex.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 zeroize.workspace = true

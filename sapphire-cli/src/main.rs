@@ -84,9 +84,10 @@ fn cmd_escrow_demo(threshold: u16, total: u16) -> Result<()> {
     use frost_rerandomized::{RandomizedParams, Randomizer};
     use reddsa::frost::redpallas::PallasBlake2b512 as DemoCs;
     use sapphire_escrow::{
-        validate_settlement, verifiers::HashPreimage, Address, EscrowTerms, PaymentLeg,
+        verifiers::HashPreimage, Address, EscrowTerms, PaymentLeg, ReleaseProposal,
         SettlementIntent, Zatoshis,
     };
+    use sapphire_node::EscrowPolicy;
     use std::collections::BTreeMap;
 
     let mut rng = OsRng;
@@ -141,15 +142,8 @@ fn cmd_escrow_demo(threshold: u16, total: u16) -> Result<()> {
         print_block(&chain, &results, label);
     }
     let pkp = chain.state.group.as_ref().unwrap().pkp.clone();
-    let mut nodes: Vec<Node<DemoCs>> = participants
-        .into_iter()
-        .map(|p| p.into_node().expect("DKG complete"))
-        .collect();
 
     // ---- the escrow ----
-    println!("\n[escrow] Bob funded an 8 ZEC escrow at the group address, locked");
-    println!("         by a hash-preimage condition. Release pays u_alice; on");
-    println!("         timeout it refunds u_bob.");
     let secret = b"parcel #4417 delivered".to_vec();
     let terms = EscrowTerms {
         escrow_id: [0x5a; 32],
@@ -160,121 +154,105 @@ fn cmd_escrow_demo(threshold: u16, total: u16) -> Result<()> {
         condition: HashPreimage::digest(&secret).to_vec(),
     };
 
-    // The oracle/relayer proposes a release, revealing the preimage as witness.
-    let release = SettlementIntent {
-        payment: PaymentLeg {
-            amount: Zatoshis(800_000_000),
-            to: Address("u_alice".into()),
-        },
-        witness: secret.clone(),
-    };
+    // Each validator becomes a *validating* signer: its react() runs the escrow
+    // predicate against terms it holds itself, and refuses to commit unless a
+    // proposed release matches. The gate lives INSIDE the node, not in the demo.
+    let mut nodes: Vec<Node<DemoCs>> = participants
+        .into_iter()
+        .map(|p| {
+            p.into_node()
+                .expect("DKG complete")
+                .with_policy(EscrowPolicy::new(HashPreimage).with_escrow(terms.clone()))
+        })
+        .collect();
 
-    // ---- the validation gate: every validator checks before signing ----
-    println!("\n[validators] each runs the escrow predicate before signing:");
-    let mut accepted = 0usize;
-    for (i, _node) in nodes.iter().enumerate() {
-        match validate_settlement(&terms, &release, &HashPreimage) {
-            Ok(()) => {
-                accepted += 1;
-                println!("  validator {:>2}: ✔ accept", i + 1);
-            }
-            Err(e) => println!("  validator {:>2}: ✘ refuse ({e})", i + 1),
-        }
-    }
-    if accepted < threshold as usize {
-        return Err(anyhow!(
-            "only {accepted} validators accepted; threshold {threshold} not met"
-        ));
-    }
-    println!(
-        "  → {accepted}/{total} accept, threshold {threshold} met → sign leg A."
-    );
+    println!("\n[escrow] Bob funded an 8 ZEC escrow, locked by a hash-preimage");
+    println!("         condition. Every validator holds the terms; release pays");
+    println!("         u_alice, timeout refunds u_bob.\n");
 
-    // The bytes the validators sign. In the real flow this is the PCZT's
-    // ZIP-244 sighash; here it's the canonical settlement bytes as a stand-in.
-    let message = serde_json::to_vec(&serde_json::json!({
-        "escrow_id": hex::encode(terms.escrow_id),
-        "payment": serde_json::to_value(&release.payment)?,
-    }))?;
-
-    let request_id = Uuid::new(&mut rng);
     let randomizer = {
         let scalar = <<<DemoCs as frost_core::Ciphersuite>::Group as Group>::Field as Field>::random(&mut rng);
         Randomizer::<DemoCs>::from_scalar(scalar)
     };
-    println!("\n[sign] sighash stand-in: {}", hex::encode(&message));
-    println!("[sign] randomizer (α): {}", hex::encode(randomizer.serialize()));
+
+    // ---- happy path: a correct release the validators will sign ----
+    println!("[release] oracle proposes paying u_alice, revealing the preimage.");
+    let good_msg = serde_json::to_vec(&ReleaseProposal {
+        escrow_id: terms.escrow_id,
+        intent: SettlementIntent {
+            payment: PaymentLeg {
+                amount: Zatoshis(800_000_000),
+                to: Address("u_alice".into()),
+            },
+            witness: secret.clone(),
+        },
+    })?;
+    let good_id = Uuid::new(&mut rng);
     chain.submit(ChainTx::SubmitRequest {
-        request_id,
-        message: message.clone(),
+        request_id: good_id,
+        message: good_msg.clone(),
         randomizer,
     });
-    let results = chain.commit_block();
-    print_block(&chain, &results, "SubmitRequest");
-
-    println!("\n[validators] reacting → round-1 commitments");
-    for v in nodes.iter_mut() {
-        for tx in v.react(&chain.state, &mut rng)? {
-            chain.submit(tx);
+    chain.commit_block();
+    for label in ["round-1 commitments", "round-2 rerandomized shares"] {
+        println!("[validators] validate internally → react → {label}");
+        for v in nodes.iter_mut() {
+            for tx in v.react(&chain.state, &mut rng)? {
+                chain.submit(tx);
+            }
         }
+        chain.commit_block();
     }
-    let results = chain.commit_block();
-    print_block(&chain, &results, "SubmitCommitments");
-
-    println!("\n[validators] reacting → round-2 rerandomized shares");
-    for v in nodes.iter_mut() {
-        for tx in v.react(&chain.state, &mut rng)? {
-            chain.submit(tx);
-        }
-    }
-    let results = chain.commit_block();
-    print_block(&chain, &results, "SubmitShares");
-
-    let entry = chain
-        .state
-        .requests
-        .get(&request_id)
-        .ok_or_else(|| anyhow!("request missing from final state"))?;
-    match &entry.status {
+    match &chain.state.requests.get(&good_id).unwrap().status {
         RequestStatus::Completed {
             signature,
             participants,
         } => {
-            let randomized_params =
-                RandomizedParams::<DemoCs>::from_randomizer(pkp.verifying_key(), randomizer);
-            randomized_params
+            RandomizedParams::<DemoCs>::from_randomizer(pkp.verifying_key(), randomizer)
                 .randomized_verifying_key()
-                .verify(&message, signature)
+                .verify(&good_msg, signature)
                 .map_err(|e| anyhow!("verification failed: {e}"))?;
-            let sig_bytes = signature
-                .serialize()
-                .map_err(|e| anyhow!("serializing: {e}"))?;
+            let sig_bytes = signature.serialize().map_err(|e| anyhow!("serializing: {e}"))?;
             println!("\n== RELEASE AUTHORIZED ==");
-            println!("signers      : {} of {}", participants.len(), total);
-            println!("authorizes   : release 8 ZEC → u_alice (leg A)");
-            println!("signature    : {}", hex::encode(&sig_bytes));
-            println!("verified vs  : rerandomized vk (rk = ak + α·G)");
+            println!("signers    : {} of {}", participants.len(), total);
+            println!("authorizes : release 8 ZEC → u_alice (leg A)");
+            println!("signature  : {}", hex::encode(&sig_bytes));
+            println!("verified vs: rerandomized vk (rk = ak + α·G)");
         }
-        other => {
-            return Err(anyhow!("expected Completed, got {:?}", other));
-        }
+        other => return Err(anyhow!("expected Completed, got {:?}", other)),
     }
 
-    // ---- the reject path: a tampered release earns no signature ----
-    println!("\n[reject path] the oracle tampers — same money, paid to an attacker:");
-    let tampered = SettlementIntent {
-        payment: PaymentLeg {
-            amount: Zatoshis(800_000_000),
-            to: Address("u_attacker".into()),
+    // ---- reject path: the gate refuses internally, so no signature forms ----
+    println!("\n[reject] oracle tampers — same money, same preimage, paid to u_attacker.");
+    let bad_msg = serde_json::to_vec(&ReleaseProposal {
+        escrow_id: terms.escrow_id,
+        intent: SettlementIntent {
+            payment: PaymentLeg {
+                amount: Zatoshis(800_000_000),
+                to: Address("u_attacker".into()),
+            },
+            witness: secret,
         },
-        witness: secret,
-    };
-    match validate_settlement(&terms, &tampered, &HashPreimage) {
-        Ok(()) => println!("  unexpectedly accepted — this would be a bug!"),
-        Err(e) => {
-            println!("  validators: ✘ REJECT — {e}");
-            println!("  → no FROST share is produced. The gate held; no signature exists.");
+    })?;
+    let bad_id = Uuid::new(&mut rng);
+    chain.submit(ChainTx::SubmitRequest {
+        request_id: bad_id,
+        message: bad_msg,
+        randomizer,
+    });
+    chain.commit_block();
+    for v in nodes.iter_mut() {
+        for tx in v.react(&chain.state, &mut rng)? {
+            chain.submit(tx);
         }
+    }
+    chain.commit_block();
+    match &chain.state.requests.get(&bad_id).unwrap().status {
+        RequestStatus::AwaitingCommitments { commitments } if commitments.is_empty() => {
+            println!("  → 0 commitments. Every validator refused inside react.");
+            println!("  → no threshold, no aggregation, no signature. The gate held.");
+        }
+        other => return Err(anyhow!("tampered release must not progress, got {:?}", other)),
     }
     Ok(())
 }
